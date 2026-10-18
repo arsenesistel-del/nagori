@@ -105,7 +105,7 @@ function catSpot(w){
   for (const c of dayPlan(w.y,w.m,w.d).cat) if (w.hour >= c.from && w.hour < c.to) return c.spot;
   return null;
 }
-const CAT_POS = { roof:[470,540], bench:[812,662], bowl:[628,682] };
+const CAT_POS = { roof:[470,540], bench:[812,662], bowl:[668,682] };
 
 /* ---------- Couleurs ---------- */
 const mix = (a,b,t) => [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t];
@@ -119,126 +119,115 @@ function skyAt(e){
   for (let i=0;i<SKY.length-1;i++){ const a=SKY[i], b=SKY[i+1]; if (e<=b[0]) { const t=(e-a[0])/(b[0]-a[0]); return [mix(a[1],b[1],t), mix(a[2],b[2],t)]; } }
   return [SKY[SKY.length-1][1], SKY[SKY.length-1][2]];
 }
-const NIGHT = [14,18,36];
-const C = { wood:[126,88,60], roof:[56,62,76], plaster:[212,202,182], plat:[152,149,140], platFace:[96,94,90], tactile:[214,178,62],
-  rail:[74,70,68], gravel:[86,80,76], pole:[72,54,42], sign:[238,236,228], signBar:[46,112,78], body:[228,222,206], stripe:[50,118,86],
-  troof:[150,152,156], glass:[38,46,60], lit:[248,212,148], coat:[44,50,64], soil:[92,66,48], bench:[110,76,52] };
 const FOLIAGE = [[96,124,78],[46,98,58],[170,86,44],[90,98,106]];
 const TREES = [[62,92,64],[38,78,48],[124,70,42],[70,78,88]];
 const GRASS = [[90,116,72],[62,104,60],[124,104,62],[96,98,92]];
 const DEBRIS = [[236,182,196],[78,112,62],[188,92,44],[230,234,240]];
 
-/* ---------- Canvas ---------- */
+/* ---------- Canvas et cadrage ----------
+   Le décor vit dans un repère fixe de 1600 × 900. Le cadrage choisit l'échelle et le centre selon l'écran :
+   en paysage on voit toute la gare ; en portrait on cadre le bâtiment, la lampe et le banc, et on glisse pour regarder ailleurs.
+   Repères principaux (x) : boîte aux lettres 300, gare 360-610, distributeur 620-654, lampe 694, banc 740-830,
+   panneau 860-1010, fin du quai 1200, passage à niveau 1340. Quai : dessus 668, face jusqu'à 716. Jardin au premier plan 560-740. */
 const cv = $('#scene'), ctx = cv.getContext('2d');
-let W=0,H=0,DPR=1, S=1, OX=0, OY=0;
+let W=0,H=0,DPR=1, S=1, OX=0, OY=0, uiTop=0;
 const VW=1600, VH=900;
+const cam = { pan:0, vel:0, drag:null, justDragged:false };
+function layoutCam(){
+  const portrait = W < H*0.9;
+  const span = portrait ? 520 : 1100, cx = portrait ? 592 : 760;
+  S = Math.min(W/span, Math.max(140, uiTop - 12) / (portrait ? 400 : 460));
+  const minX = -150, maxX = 1750, half = W/2/S;
+  let c = cx + cam.pan;
+  if (maxX - minX > 2*half) c = clamp(c, minX + half, maxX - half); else c = (minX + maxX)/2;
+  cam.pan = c - cx;
+  OX = W/2 - c*S;
+  OY = (uiTop - 10) - 772*S;
+}
 function resize(){
   DPR = Math.min(2, window.devicePixelRatio||1);
   W = cv.clientWidth; H = cv.clientHeight;
   cv.width = Math.round(W*DPR); cv.height = Math.round(H*DPR);
-  S = Math.max(H/VH*0.62, W/VW);
-  OY = H - VH*S;
   const ges = document.querySelector('.gestures');
-  if (ges){ const top = ges.getBoundingClientRect().top - cv.getBoundingClientRect().top; OY = Math.min(OY, top - 6 - 716*S); }
-  OX = Math.min(0, Math.max(W - VW*S, W/2 - 790*S));
+  uiTop = ges ? ges.getBoundingClientRect().top - cv.getBoundingClientRect().top : H;
+  layoutCam();
 }
 addEventListener('resize', resize);
 
 const R = rng(1685);
 function ridge(base, amp, step, shift){
   const pts = []; const p = [R()*6, R()*6, R()*6];
-  for (let x=-200; x<=1800; x+=step) pts.push([x, base - amp*(0.45*Math.sin(x*0.0021+p[0]+shift) + 0.35*Math.abs(Math.sin(x*0.0057+p[1])) + 0.2*Math.sin(x*0.013+p[2]) + 0.55)]);
+  for (let x=-300; x<=1900; x+=step) pts.push([x, base - amp*(0.45*Math.sin(x*0.0021+p[0]+shift) + 0.35*Math.abs(Math.sin(x*0.0057+p[1])) + 0.2*Math.sin(x*0.013+p[2]) + 0.55)]);
   return pts;
 }
 const FAR = ridge(520, 150, 10, 0), NEAR = ridge(536, 70, 8, 2);
-const TREELINE = Array.from({length:150},(_,i)=>({x:-200+i*14+R()*8, r:9+R()*14}));
-const STARS = Array.from({length:170},()=>({x:R(), y:R()*0.62, r:R()*1.2+.3, tw:R()*6}));
-const CLOUDS = Array.from({length:8},()=>({x:R()*1.2, y:.06+R()*.28, s:.6+R()*.9, v:.004+R()*.006, parts:Array.from({length:5},()=>[R()*120-60,R()*30-15,30+R()*40])}));
-const RAIN = Array.from({length:260},()=>({x:R(),y:R(),l:.6+R()*.6,v:.8+R()*.5}));
-const SNOW = Array.from({length:200},()=>({x:R(),y:R(),r:1+R()*2.2,v:.25+R()*.3,ph:R()*6}));
+const TREELINE = Array.from({length:170},(_,i)=>({x:-300+i*14+R()*8, r:9+R()*14}));
+const STARS = Array.from({length:190},()=>({x:R(), y:R()*0.7, r:R()*1.2+.3, tw:R()*6}));
+const CLOUDS = Array.from({length:9},()=>({x:R()*1.2, y:.04+R()*.3, s:.6+R()*.9, v:.004+R()*.006, parts:Array.from({length:5},()=>[R()*120-60,R()*30-15,30+R()*40])}));
+const RAIN = Array.from({length:280},()=>({x:R(),y:R(),l:.6+R()*.6,v:.8+R()*.5}));
+const SNOW = Array.from({length:220},()=>({x:R(),y:R(),r:1+R()*2.2,v:.25+R()*.3,ph:R()*6}));
 const FLIES = Array.from({length:34},()=>({x:R()*1600,y:540+R()*110,ph:R()*6,sp:.3+R()*.6}));
-const LEAVES = Array.from({length:70},()=>({x:262+R()*916, y:672+R()*15, a:R()*6, s:.7+R()*.7}));
-let ripples = [];
+const LEAVES = Array.from({length:80},()=>({x:240+R()*950, y:671+R()*16, a:R()*6, s:.7+R()*.7}));
+const PUDDLES = [[300,684,34,4],[520,686,46,5],[700,683,38,4],[905,687,52,5],[1100,684,30,4],[200,742,60,6],[860,752,70,7],[1300,746,56,6]];
+const GRASS_TUFTS = Array.from({length:60},()=>({x:-150+R()*1900, y:722+R()*150, h:6+R()*12, s:R()}));
+let ripples = [], smoke = [];
 
-/* ---------- État ---------- */
-let real = null;
-const wx = { cloud:.3, rain:0, snow:0, fog:0, storm:0 };
-let flash = 0, lastFrame = performance.now(), clock = 0;
-const train = { phase:'idle', x:2000, t:0, stop:true, traveler:false };
-const STOP_X = 520, CAR = 258, GAP = 8;
-const trav = { state:'none', x:0, walk:0, alpha:1 };
-let water = null, sweep = null, purr = null, lastTrainKey = null, panelStep = 0, cur = null;
-
-function kindNow(){ if (sim.weather !== 'auto') return sim.weather; return real ? real.kind : 'partly'; }
-
-/* ---------- Trains ---------- */
-/* la sonnerie du passage à niveau commence avant que le train n'apparaisse (t négatif) */
-const BELL_LEAD = 8, CROSSING_X = 1340, PX_PER_M = 12.9;
-function startTrain(opts){ if (train.phase !== 'idle') return false; Object.assign(train, {phase: opts.stop ? 'in' : 'pass', t:-BELL_LEAD, x:1750, prevX:1750, v:0, stop:opts.stop, traveler:!!opts.traveler, said:{}}); return true; }
-const easeOut = t => 1-Math.pow(1-t,3), easeIn = t => t*t*t;
-function updateTrain(dt){
-  if (train.phase==='idle') return;
-  train.t += dt;
-  const T0 = Math.max(0, train.t), once = k => { if (train.said[k]) return false; train.said[k] = true; return true; };
-  const pan = clamp((train.x + CAR - 790) / 900, -1, 1);
-  if (train.phase==='pass'){ train.x = 1750 - T0*300; if (train.t > -1.2 && once('horn')) son.event('horn', {pan: .8}); if (train.x < -800) train.phase='idle'; }
-  else if (train.phase==='in'){ const k=Math.min(1,T0/7); train.x = 1750 + (STOP_X-1750)*easeOut(k); if (k > .55 && once('brake')) son.event('brake', {pan}); if (k>=1){ train.phase='stop'; train.t=0; son.event('hiss', {pan}); son.event('doors', {pan, delay: .9}); } }
-  else if (train.phase==='stop'){ if (train.traveler && train.t>2.2 && trav.state==='none'){ trav.state='walk'; trav.x=STOP_X+CAR+GAP+70; trav.alpha=1; train.traveler=false; } if (train.t > 7.6 && once('close')) son.event('doors', {pan}); if (train.t>9){ train.phase='out'; train.t=0; train.said = {}; } }
-  else if (train.phase==='out'){ const k=Math.min(1,T0/7); train.x = STOP_X + (-700-STOP_X)*easeIn(k); if (k>=1) train.phase='idle'; }
-  train.v = dt > 0 ? Math.abs(train.x - train.prevX) / dt : 0; train.prevX = train.x;
-}
-/* la sonnerie sonne tant que le train n'a pas franchi le passage à niveau (à droite du quai) */
-function crossingActive(){
-  if (train.phase==='in') return train.x + 2*CAR > CROSSING_X - 40;
-  if (train.phase==='pass') return train.x + 2*CAR + GAP > CROSSING_X - 40;
-  return false;
-}
-function travelerState(w){
-  const s = seasonOf(w.y,w.m,w.d), tv = travelerOf(s);
-  const welcomed = save.gifts[tv.key] != null;
-  const arrived = save.arrived[tv.key] || idx(w.y,w.m,w.d,w.hour) >= tv.at;
-  return { s, tv, welcomed, waiting: arrived && !welcomed };
-}
-function updateTraveler(dt){
-  if (trav.state==='walk'){ trav.x -= 38*dt; trav.walk += dt*7; if (trav.x <= 750){ trav.state='none'; const st = travelerState(worldTime()); save.arrived[st.tv.key] = true; persist(); showTraveler(); } }
-  else if (trav.state==='leave'){ trav.x -= 40*dt; trav.walk += dt*7; if (trav.x < 500) trav.alpha -= dt*1.2; if (trav.alpha<=0) trav.state='none'; }
-}
-
-/* ---------- Dessin ---------- */
+/* ---------- Dessin ----------
+   Lumière : L va de la nuit (0,2) au plein jour (1) ; les couleurs se mélangent vers l'indigo de nuit. */
+const NIGHT = [20,26,52];
+const C = { wood:[104,72,50], woodDark:[70,48,36], roof:[138,62,46], plaster:[214,204,184], plat:[150,147,140], platFace:[92,90,88], tactile:[214,178,62],
+  rail:[74,70,68], gravel:[86,80,76], pole:[72,54,42], sign:[238,236,228], signBar:[46,112,78], body:[226,224,214], stripeG:[92,170,96], stripeB:[48,84,150],
+  troof:[150,152,156], glass:[40,50,66], lit:[250,212,150], soil:[92,66,48], bench:[118,82,56], snow:[236,240,246], vend:[46,92,150] };
 const shade = (c, L) => mix(NIGHT, c, L);
+const col = (c, k, a=1) => rgb(shade(c, k), a);
+function glow(x, y, r, color, a){ if (a <= .005) return; const g = ctx.createRadialGradient(x,y,0,x,y,r); g.addColorStop(0, `rgba(${color},${a})`); g.addColorStop(1, `rgba(${color},0)`); ctx.fillStyle = g; ctx.fillRect(x-r,y-r,r*2,r*2); }
+/* neige au sol : réelle (épaisseur Open-Meteo), ou en train de tomber */
+let snowCover = 0, wetness = 0, lastFx = 0;
+function weatherCover(dt){
+  const kind = kindNow(), depth = real && sim.weather === 'auto' ? real.snowDepth : 0;
+  let target = sim.ground ? 1 : clamp(depth / .12, 0, 1);
+  if (isSnow(kind)) target = Math.max(target, .55 + wx.snow*.3);
+  snowCover += (target - snowCover) * Math.min(1, dt*.15);
+  const wetTarget = isRain(kind) ? 1 : 0;
+  wetness += (wetTarget - wetness) * Math.min(1, dt * (wetTarget ? .3 : .01));
+}
+function tempNow(){ return real && sim.weather === 'auto' ? real.temp : (isSnow(kindNow()) || sim.ground ? -3 : 12); }
+
 function drawScene(w, info){
   const {e} = info.sun;
   const Lraw = clamp((e+.25)/.6, 0, 1);
-  const L = (0.12 + 0.88*Lraw) * (1 - .28*wx.cloud);
+  const L = (0.2 + 0.8*Lraw) * (1 - .25*wx.cloud);
   const night = 1 - Lraw;
   let [top, bot] = skyAt(e);
-  const grey = mix([20,24,32],[150,158,168], Lraw);
+  const grey = mix([22,28,40],[150,158,168], Lraw);
   top = mix(top, mix(grey,[0,0,0],.08), wx.cloud*.78); bot = mix(bot, grey, wx.cloud*.7);
   const season = info.season.season;
-  const snowy = wx.snow > .4 || groundSnow();
-  const wind = windNow();
+  const snowy = snowCover > .25;
+  const wind = windNow(), temp = tempNow();
+  const now = performance.now(), dt = Math.min(.1, (now - (lastFx||now))/1000); lastFx = now;
+  weatherCover(dt);
   info.L = L; info.night = night; info.snowy = snowy;
 
+  /* ---- ciel (écran) */
   ctx.setTransform(DPR,0,0,DPR,0,0);
   const horizonY = OY + 540*S;
-  let g = ctx.createLinearGradient(0,0,0,horizonY);
+  let g = ctx.createLinearGradient(0,0,0,Math.max(10,horizonY));
   g.addColorStop(0, rgb(top)); g.addColorStop(1, rgb(bot));
   ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
-
   const starA = clamp(-e*1.6,0,1) * (1-wx.cloud);
   if (starA > .01){ for (const s of STARS){ ctx.fillStyle = `rgba(240,238,225,${starA*(.55+.45*Math.sin(clock*1.3+s.tw))})`; ctx.beginPath(); ctx.arc(s.x*W, s.y*horizonY, s.r, 0, 7); ctx.fill(); } }
   if (info.sun.t != null && wx.cloud < .85){
     const sx = W*(.12+.76*info.sun.t), sy = horizonY - Math.max(0,e)*horizonY*.82;
     const sg = ctx.createRadialGradient(sx,sy,0,sx,sy,120*S+40);
     sg.addColorStop(0,`rgba(255,240,205,${.9*(1-wx.cloud)})`); sg.addColorStop(.12,`rgba(255,228,180,${.5*(1-wx.cloud)})`); sg.addColorStop(1,'rgba(255,220,170,0)');
-    ctx.fillStyle = sg; ctx.fillRect(sx-200,sy-200,400,400);
+    ctx.fillStyle = sg; ctx.fillRect(sx-260,sy-260,520,520);
   }
   const moonA = clamp(-e*2,0,1) * (1-wx.cloud*.9);
+  const mx = W*.78, my = Math.max(70, horizonY*.3);
   if (moonA > .02){
-    const p = info.moon, k = (1-Math.cos(2*Math.PI*p))/2, s = p < .5 ? 1 : -1;
-    const mx = W*.8, my = Math.max(60, horizonY*.22), r = 16 + 6*S;
-    const mg = ctx.createRadialGradient(mx,my,0,mx,my,r*5); mg.addColorStop(0,`rgba(240,236,214,${.22*moonA*k})`); mg.addColorStop(1,'rgba(240,236,214,0)');
-    ctx.fillStyle = mg; ctx.fillRect(mx-r*5,my-r*5,r*10,r*10);
+    const p = info.moon, k = (1-Math.cos(2*Math.PI*p))/2, s = p < .5 ? 1 : -1, r = 14 + 8*S;
+    const mg = ctx.createRadialGradient(mx,my,0,mx,my,r*6); mg.addColorStop(0,`rgba(240,236,214,${.25*moonA*k})`); mg.addColorStop(1,'rgba(240,236,214,0)');
+    ctx.fillStyle = mg; ctx.fillRect(mx-r*6,my-r*6,r*12,r*12);
     ctx.fillStyle = `rgba(200,205,220,${.08*moonA})`; ctx.beginPath(); ctx.arc(mx,my,r,0,7); ctx.fill();
     ctx.fillStyle = `rgba(244,240,222,${moonA})`; ctx.beginPath();
     for (let a=-Math.PI/2; a<=Math.PI/2+.001; a+=Math.PI/40) ctx.lineTo(mx + s*r*Math.cos(a), my + r*Math.sin(a));
@@ -255,69 +244,87 @@ function drawScene(w, info){
     }
   }
 
-  // ---- scène
+  /* ---- décor (repère de la scène) */
   ctx.setTransform(DPR*S,0,0,DPR*S,DPR*OX,DPR*OY);
   const farC = shade(mix(bot,[44,54,84],.5), .55+.45*L), nearC = shade(mix(bot,[30,40,56],.72), .4+.6*L);
-  const snowCap = season===3 ? .9 : (info.season.i===17||info.season.i===0||info.season.i===1) ? .45 : 0;
-  for (const [pts,col,base] of [[FAR,farC,520],[NEAR,nearC,536]]){
-    ctx.beginPath(); ctx.moveTo(-200,600); for (const [x,y] of pts) ctx.lineTo(x,y); ctx.lineTo(1800,600); ctx.closePath();
-    ctx.fillStyle = rgb(col); ctx.fill();
-    if (snowCap && base===520){ ctx.save(); ctx.clip(); ctx.fillStyle = rgb(shade([236,238,242],.35+.65*L), snowCap*.85); ctx.fillRect(-200,0,2000,base-112); ctx.restore(); }
+  const capAmt = Math.max(snowCover, season===3 ? .8 : (info.season.i===17||info.season.i===0||info.season.i===1) ? .4 : 0);
+  for (const [pts,c,base] of [[FAR,farC,520],[NEAR,nearC,536]]){
+    ctx.beginPath(); ctx.moveTo(-300,600); for (const [x,y] of pts) ctx.lineTo(x,y); ctx.lineTo(1900,600); ctx.closePath();
+    ctx.fillStyle = rgb(c); ctx.fill();
+    if (capAmt > .05){ ctx.save(); ctx.clip(); ctx.fillStyle = rgb(shade(C.snow,.35+.65*L), capAmt*(base===520 ? .85 : .5)); ctx.fillRect(-300,0,2200, base===520 ? base-112 : base-40); ctx.restore(); }
   }
-  const haze = ctx.createLinearGradient(0,430,0,560); haze.addColorStop(0,rgb(bot,0)); haze.addColorStop(1,rgb(bot,.45+.3*wx.fog)); ctx.fillStyle = haze; ctx.fillRect(-200,430,2000,130);
+  const haze = ctx.createLinearGradient(0,430,0,560); haze.addColorStop(0,rgb(bot,0)); haze.addColorStop(1,rgb(bot,.45+.3*wx.fog)); ctx.fillStyle = haze; ctx.fillRect(-300,430,2200,130);
+  // rivière
   g = ctx.createLinearGradient(0,548,0,648); g.addColorStop(0, rgb(mix(bot,[10,16,30],.35))); g.addColorStop(1, rgb(mix(top,[6,10,22],.55)));
-  ctx.fillStyle = g; ctx.fillRect(-200,548,2000,100);
+  ctx.fillStyle = g; ctx.fillRect(-300,548,2200,100);
   ctx.strokeStyle = rgb(mix(bot,[255,255,255],.25), .18+.12*Lraw); ctx.lineWidth = 1.2;
-  for (let i=0;i<26;i++){ const y = 560 + (i*37%84); const x = ((i*211 + clock*(8+i%5)) % 1900) - 150; ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+30+(i%4)*14,y); ctx.stroke(); }
+  for (let i=0;i<30;i++){ const y = 560 + (i*37%84); const x = ((i*211 + clock*(8+i%5)) % 2100) - 250; ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+30+(i%4)*14,y); ctx.stroke(); }
   if (moonA>.05 || (info.sun.t!=null && wx.cloud<.7)){
-    const rx = moonA>.05 ? (W*.8-OX)/S : ((W*(.12+.76*(info.sun.t||0)))-OX)/S;
+    const rx = moonA>.05 ? (mx-OX)/S : ((W*(.12+.76*(info.sun.t||0)))-OX)/S;
     ctx.fillStyle = moonA>.05 ? `rgba(244,240,222,${.18*moonA})` : `rgba(255,228,180,${.2*(1-wx.cloud)})`;
     for (let i=0;i<9;i++){ const ww = 10+Math.sin(clock*2+i)*6+i*2; ctx.fillRect(rx-ww/2 + Math.sin(clock+i)*4, 556+i*10, ww, 2.2); }
   }
-  ctx.fillStyle = rgb(shade(snowy ? [196,204,214] : TREES[season], .3+.7*L)); ctx.fillRect(-200,546,2000,8);
+  ctx.fillStyle = col(snowy ? [196,204,214] : TREES[season], .3+.7*L); ctx.fillRect(-300,546,2200,8);
   for (const t of TREELINE){ ctx.beginPath(); ctx.arc(t.x, 548, t.r, Math.PI, 0); ctx.fill(); }
-  if (info.flies){ for (const f of FLIES){ const a = Math.max(0, Math.sin(clock*f.sp*2+f.ph)); const x = f.x + Math.sin(clock*.3+f.ph)*12, y = f.y + Math.cos(clock*.4+f.ph)*6; const fg = ctx.createRadialGradient(x,y,0,x,y,9); fg.addColorStop(0,`rgba(214,255,140,${.9*a})`); fg.addColorStop(1,'rgba(214,255,140,0)'); ctx.fillStyle = fg; ctx.fillRect(x-9,y-9,18,18); } }
-  if (wx.rain > .2){ if (Math.random() < wx.rain*.7) ripples.push({x:Math.random()*1800-100, y:560+Math.random()*80, t:0}); ctx.strokeStyle = 'rgba(220,228,240,.25)'; ctx.lineWidth=1; ripples = ripples.filter(r=>{ r.t += .016; ctx.globalAlpha = Math.max(0,1-r.t*1.4); ctx.beginPath(); ctx.ellipse(r.x,r.y,4+r.t*22,1+r.t*5,0,0,7); ctx.stroke(); return r.t < .75; }); ctx.globalAlpha = 1; }
+  if (snowy){ ctx.fillStyle = col(C.snow, .35+.65*L, .7*snowCover); for (const t of TREELINE){ ctx.beginPath(); ctx.ellipse(t.x, 548-t.r*.8, t.r*.7, t.r*.3, 0, Math.PI, 0); ctx.fill(); } }
+  if (info.flies){ for (const f of FLIES){ const a = Math.max(0, Math.sin(clock*f.sp*2+f.ph)); const x = f.x + Math.sin(clock*.3+f.ph)*12, y = f.y + Math.cos(clock*.4+f.ph)*6; glow(x, y, 9, '214,255,140', .9*a); } }
+  if (wx.rain > .2){ if (Math.random() < wx.rain*.7) ripples.push({x:Math.random()*2000-200, y:560+Math.random()*80, t:0}); ctx.strokeStyle = 'rgba(220,228,240,.25)'; ctx.lineWidth=1; ripples = ripples.filter(r=>{ r.t += .016; ctx.globalAlpha = Math.max(0,1-r.t*1.4); ctx.beginPath(); ctx.ellipse(r.x,r.y,4+r.t*22,1+r.t*5,0,0,7); ctx.stroke(); return r.t < .75; }); ctx.globalAlpha = 1; }
   // poteaux et fils
-  ctx.strokeStyle = rgb(shade([40,36,36], .3+.7*L), .9); ctx.lineWidth = 1.2;
-  for (const dy of [0,14]){ ctx.beginPath(); ctx.moveTo(-200, 350+dy); ctx.quadraticCurveTo(0, 380+dy, 200, 342+dy); ctx.quadraticCurveTo(650, 400+dy, 1100, 342+dy); ctx.quadraticCurveTo(1450, 400+dy, 1800, 352+dy); ctx.stroke(); }
-  ctx.fillStyle = rgb(shade(C.pole, .25+.75*L)); for (const x of [200,1100]){ ctx.fillRect(x-4, 330, 8, 318); ctx.fillRect(x-26, 340, 52, 5); }
+  ctx.strokeStyle = col([40,36,36], .3+.7*L, .9); ctx.lineWidth = 1.2;
+  for (const dy of [0,14]){ ctx.beginPath(); ctx.moveTo(-300, 350+dy); ctx.quadraticCurveTo(0, 380+dy, 200, 342+dy); ctx.quadraticCurveTo(650, 400+dy, 1100, 342+dy); ctx.quadraticCurveTo(1450, 400+dy, 1900, 352+dy); ctx.stroke(); }
+  ctx.fillStyle = col(C.pole, .25+.75*L); for (const x of [200,1100]){ ctx.fillRect(x-4, 330, 8, 318); ctx.fillRect(x-26, 340, 52, 5); }
   // voie
-  ctx.fillStyle = rgb(shade(C.gravel, .25+.75*L)); ctx.fillRect(-200,640,2000,30);
-  ctx.fillStyle = rgb(shade(C.rail, .3+.7*L)); ctx.fillRect(-200,651,2000,3); ctx.fillRect(-200,661,2000,3);
+  ctx.fillStyle = col(C.gravel, .25+.75*L); ctx.fillRect(-300,640,2200,30);
+  if (snowy){ ctx.fillStyle = col(C.snow, .35+.65*L, .85*snowCover); ctx.fillRect(-300,640,2200,9); }
+  ctx.fillStyle = col(C.rail, .3+.7*L); ctx.fillRect(-300,651,2200,3); ctx.fillRect(-300,661,2200,3);
+  if (wetness > .2 || snowy) { ctx.fillStyle = `rgba(230,236,246,${.25*Math.max(wetness, snowCover)*(.3+.7*L)})`; ctx.fillRect(-300,651,2200,1); ctx.fillRect(-300,661,2200,1); }
   for (const p of info.people) if (p.kind==='worker') figure(p, 652, L, night);
-  drawTrain(L, night);
-  drawCrossing(L, night, crossingActive());
-  // quai
-  ctx.fillStyle = rgb(shade(mix(C.gravel,[0,0,0],.2), .2+.8*L)); ctx.fillRect(-200,668,2000,50);
-  ctx.fillStyle = rgb(shade(C.plat, .22+.78*L)); ctx.fillRect(250,668,940,22);
-  ctx.fillStyle = rgb(shade(C.tactile, .3+.7*L)); ctx.fillRect(250,670,940,5);
-  ctx.fillStyle = rgb(shade(C.platFace, .2+.8*L)); ctx.fillRect(250,690,940,26);
-  if (snowy){ ctx.fillStyle = rgb(shade([232,236,242], .4+.6*L), .9); ctx.fillRect(250,676,940,10); }
+  drawTrain(L, night, snowy);
+  drawCrossing(L, night, crossingActive(), snowy);
+
+  /* ---- quai */
+  ctx.fillStyle = col(mix(C.gravel,[0,0,0],.2), .2+.8*L); ctx.fillRect(-300,668,2200,50);
+  const platC = mix(C.plat, [40,44,56], wetness*.45);
+  ctx.fillStyle = col(platC, .22+.78*L); ctx.fillRect(230,668,970,22);
+  ctx.fillStyle = col(C.tactile, .3+.7*L); ctx.fillRect(230,670,970,4);
+  ctx.fillStyle = col(C.platFace, .2+.8*L); ctx.fillRect(230,690,970,26);
+  ctx.fillStyle = col([60,58,58], .2+.8*L, .5); ctx.fillRect(230,690,970,2);
+  if (snowy){
+    ctx.fillStyle = col(C.snow, .42+.58*L, .95);
+    ctx.beginPath(); ctx.moveTo(230,688); for (let x=230; x<=1200; x+=20) ctx.lineTo(x, 674 - snowCover*5 + Math.sin(x*.07)*1.5); ctx.lineTo(1200,688); ctx.closePath(); ctx.fill();
+    // le chemin tassé devant la porte et le banc
+    ctx.fillStyle = col([200,206,216], .35+.65*L, .5); ctx.fillRect(470, 678, 330, 6);
+  }
+  drawReflections(L, night, info);
   drawDebris(L, season, info);
-  drawStation(L, night, snowy, info);
-  drawLamp(L, night, info.lampOn);
-  drawBench(L);
-  drawSign(L, night);
+  drawMailbox(L, snowy);
+  drawStation(L, night, snowy, info, temp, wind);
+  drawVending(L, night, snowy);
+  drawLamp(L, night, info.lampOn, snowy);
+  drawBench(L, snowy);
+  drawSign(L, night, snowy);
   drawBowl(L);
   drawItem(L, info.item);
   if (info.cat && info.cat !== 'roof') drawCat(info.cat, L, night);
-  // personnages sur le quai
-  if (info.waiting && trav.state === 'none') figure({kind:'traveler', x:750, sit:true}, 682, L, night);
+  if (info.waiting && trav.state === 'none') figure({kind:'traveler', x:760, sit:true}, 682, L, night);
   for (const p of info.people) if (p.kind!=='worker') figure(p, 682, L, night);
   if (trav.state !== 'none') figure({kind:'traveler', x:trav.x, walk:true, phase:trav.walk, fade:trav.alpha}, 682, L, night);
-  // premier plan
-  const gc = snowy ? [214,220,228] : GRASS[season];
-  g = ctx.createLinearGradient(0,716,0,900); g.addColorStop(0, rgb(shade(gc, .2+.6*L))); g.addColorStop(1, rgb(shade(mix(gc,[0,0,0],.45), .2+.6*L)));
-  ctx.fillStyle = g; ctx.fillRect(-200,716,2000,700);
-  drawGarden(L, season, snowy);
+
+  /* ---- premier plan */
+  const gc = snowy ? mix(GRASS[season], C.snow, Math.min(1, snowCover*1.3)) : GRASS[season];
+  g = ctx.createLinearGradient(0,716,0,900); g.addColorStop(0, col(gc, .22+.6*L)); g.addColorStop(1, col(mix(gc,[0,0,0],.45), .2+.6*L));
+  ctx.fillStyle = g; ctx.fillRect(-300,716,2200,700);
+  drawTufts(L, season, snowy, wind);
+  if (snowy){ ctx.fillStyle = col(C.snow, .4+.6*L, .9); for (const [x0,x1] of [[-300,236],[1194,1900]]){ ctx.beginPath(); ctx.moveTo(x0, 720); ctx.quadraticCurveTo((x0+x1)/2, 700 - snowCover*14, x1, 720); ctx.lineTo(x1,730); ctx.lineTo(x0,730); ctx.fill(); } }
+  drawGarden(L, season, snowy, wind);
+  updateSmoke(dt, wind, L, night);
   if (purr){ purr.t += .016; ctx.fillStyle = `rgba(241,201,124,${1-purr.t})`; for (let i=0;i<3;i++){ const px = purr.x + i*10 - 10, py = purr.y - 20 - purr.t*30 - i*6; ctx.beginPath(); ctx.arc(px-2,py,2.6,0,7); ctx.arc(px+2,py,2.6,0,7); ctx.moveTo(px-4.6,py+1); ctx.lineTo(px,py+6); ctx.lineTo(px+4.6,py+1); ctx.fill(); } if (purr.t>1) purr = null; }
   if (wx.fog > .05){
     const fc = mix(bot,[230,232,236],.35);
-    for (let i=0;i<5;i++){ const y = 470+i*55, x = ((clock*(6+i*2) + i*400) % 2400) - 600; const fg = ctx.createRadialGradient(x+500,y,0,x+500,y,700); fg.addColorStop(0, rgb(fc, .42*wx.fog)); fg.addColorStop(1, rgb(fc,0)); ctx.fillStyle = fg; ctx.fillRect(x-200,y-120,1400,240); }
+    for (let i=0;i<5;i++){ const y = 470+i*55, x = ((clock*(6+i*2) + i*400) % 2600) - 700; const fg = ctx.createRadialGradient(x+500,y,0,x+500,y,700); fg.addColorStop(0, rgb(fc, .42*wx.fog)); fg.addColorStop(1, rgb(fc,0)); ctx.fillStyle = fg; ctx.fillRect(x-200,y-120,1400,240); }
   }
 
-  // ---- écran
+  /* ---- écran : pluie, neige, éclairs, vignette */
   ctx.setTransform(DPR,0,0,DPR,0,0);
   if (wx.rain > .02){
     const n = Math.floor(RAIN.length*Math.min(1,wx.rain)*(reduceMotion?.4:1));
@@ -333,107 +340,225 @@ function drawScene(w, info){
   if (wx.storm > .5 && Math.random() < .004){ if (!reduceMotion) flash = .5; son.event('thunder', {delay: .8 + Math.random()*2.5}); }
   if (flash > 0){ ctx.fillStyle = `rgba(230,236,255,${flash})`; ctx.fillRect(0,0,W,H); flash -= .03; }
   const vg = ctx.createRadialGradient(W/2,H*.55,Math.min(W,H)*.35,W/2,H*.55,Math.max(W,H)*.8);
-  vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,`rgba(4,6,14,${.28+.25*night})`);
+  vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,`rgba(6,8,18,${.22+.22*night})`);
   ctx.fillStyle = vg; ctx.fillRect(0,0,W,H);
 }
 
-function drawTrain(L, night){
-  if (train.phase==='idle') return;
-  for (let c=0;c<2;c++){
-    const x = train.x + c*(CAR+GAP), y = 556, h = 102;
-    ctx.fillStyle = rgb(shade(C.troof, .25+.75*L)); ctx.fillRect(x+4, y-6, CAR-8, 8);
-    ctx.fillStyle = rgb(shade(C.body, .2+.8*L)); ctx.fillRect(x, y, CAR, h);
-    ctx.fillStyle = rgb(shade(C.stripe, .25+.75*L)); ctx.fillRect(x, y+66, CAR, 9);
-    for (let wi=0; wi<6; wi++){ ctx.fillStyle = night>.35 ? rgb(C.lit, .55+.4*night) : rgb(shade(C.glass, .3+.7*L)); ctx.fillRect(x+16+wi*40, y+16, 28, 34); }
-    ctx.fillStyle = rgb(shade([80,84,90], .25+.75*L)); ctx.fillRect(x+CAR/2-14, y+12, 28, 86);
-    ctx.fillStyle = rgb(shade([30,30,32], .3+.7*L)); ctx.fillRect(x+8, y+h, CAR-16, 6);
-    if (c===0){
-      ctx.fillStyle = night>.3 ? 'rgba(255,240,200,.95)' : rgb(shade([230,220,190],L)); ctx.fillRect(x+4, y+78, 8, 6);
-      if (night>.3 && train.phase!=='stop'){ const hg = ctx.createRadialGradient(x,y+80,0,x,y+80,220); hg.addColorStop(0,`rgba(255,236,190,${.35*night})`); hg.addColorStop(1,'rgba(255,236,190,0)'); ctx.fillStyle = hg; ctx.fillRect(x-220,y-140,240,300); }
+/* reflets des lumières sur le quai mouillé ou enneigé : c'est là que la nuit devient belle */
+function drawReflections(L, night, info){
+  const shine = Math.max(wetness, snowCover*.6) * clamp(night*1.2, 0, 1);
+  if (shine < .03) return;
+  const warm = '250,214,150', cool = '200,232,250';
+  if (night > .35){ for (const x of [404, 498, 556]) streak(x, 690, 26, 40, warm, .38*shine); }
+  streak(637, 690, 22, 36, cool, .45*shine);
+  if (info.lampOn) streak(694, 690, 18, 46, '255,226,160', .5*shine);
+  if (crossingActive() && Math.floor(clock*2.38)%2 === 0) streak(CROSSING_X-13, 690, 10, 30, '255,70,50', .5*shine);
+  if (wetness > .2){
+    for (const [x,y,rx,ry] of PUDDLES){
+      ctx.fillStyle = `rgba(150,170,200,${.12*wetness*(.4+.6*L)})`; ctx.beginPath(); ctx.ellipse(x,y,rx,ry,0,0,7); ctx.fill();
+      if (wx.rain > .2 && Math.random() < wx.rain*.25) ripples.push({x:x+(Math.random()-.5)*rx, y, t:0});
     }
   }
 }
-function drawCrossing(L, night, active){
+function streak(x, y, w, h, color, a){
+  if (a <= .01) return;
+  const g = ctx.createLinearGradient(0, y, 0, y + h);
+  g.addColorStop(0, `rgba(${color},${a})`); g.addColorStop(1, `rgba(${color},0)`);
+  ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x - w/2, y); ctx.lineTo(x + w/2, y); ctx.lineTo(x + w*.2, y + h); ctx.lineTo(x - w*.2, y + h); ctx.fill();
+}
+
+/* fumée du poêle, gaz d'échappement du train, buée des respirations */
+function puff(x, y, kind){ smoke.push({ x, y, vx:(Math.random()-.5)*4, vy: kind==='breath' ? -6 : -14 - Math.random()*6, r: kind==='breath' ? 2 : 5, a: kind==='exhaust' ? .5 : kind==='breath' ? .35 : .3, kind }); }
+function updateSmoke(dt, wind, L, night){
+  smoke = smoke.filter(p => {
+    p.x += (p.vx - wind*26)*dt; p.y += p.vy*dt; p.r += (p.kind==='breath' ? 6 : 10)*dt; p.a -= (p.kind==='breath' ? .35 : .12)*dt;
+    if (p.a <= 0) return false;
+    const c = p.kind==='exhaust' ? [90,92,96] : [210,214,222];
+    ctx.fillStyle = col(c, .3+.7*L, p.a); ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill();
+    return true;
+  });
+  if (smoke.length > 160) smoke.splice(0, smoke.length - 160);
+}
+
+/* l'autorail diesel des lignes rurales de Hokkaidō : une seule voiture, blanche à bandes verte et bleue */
+function drawTrain(L, night, snowy){
+  if (train.phase==='idle') return;
+  const x = train.x, y = 552, h = 104, k = .2+.8*L, lit = night > .3;
+  ctx.fillStyle = col([40,40,44], k); ctx.fillRect(x+30, y+h, 54, 10); ctx.fillRect(x+CAR-84, y+h, 54, 10);
+  ctx.fillStyle = col([28,28,30], k); for (const bx of [x+38, x+72, x+CAR-76, x+CAR-42]){ ctx.beginPath(); ctx.arc(bx, y+h+9, 6, 0, 7); ctx.fill(); }
+  ctx.fillStyle = col(C.body, k);
+  ctx.beginPath(); ctx.moveTo(x+10, y); ctx.lineTo(x+CAR, y); ctx.lineTo(x+CAR, y+h); ctx.lineTo(x, y+h); ctx.lineTo(x, y+14); ctx.quadraticCurveTo(x, y, x+10, y); ctx.fill();
+  ctx.fillStyle = col(C.troof, k); ctx.fillRect(x+8, y-6, CAR-14, 7); ctx.fillRect(x+CAR*.42, y-14, 44, 9);
+  ctx.fillStyle = col([60,60,64], k); ctx.fillRect(x+CAR*.72, y-22, 7, 17);
+  if (snowy || wx.snow > .3){ ctx.fillStyle = col(C.snow, .4+.6*L, .9); ctx.fillRect(x+10, y-9, CAR-16, 4); }
+  ctx.fillStyle = col(C.stripeG, k); ctx.fillRect(x, y+70, CAR, 6);
+  ctx.fillStyle = col(C.stripeB, k); ctx.fillRect(x, y+78, CAR, 3);
+  ctx.fillStyle = lit ? `rgba(${C.lit.join(',')},${.7+.25*night})` : col(C.glass, .3+.7*L);
+  ctx.fillRect(x+6, y+14, 30, 34);
+  for (let i=0;i<5;i++) ctx.fillRect(x+60+i*42, y+18, 30, 30);
+  ctx.fillStyle = col([84,88,96], k); ctx.fillRect(x+40, y+12, 16, 86); ctx.fillRect(x+CAR-34, y+12, 16, 86);
+  ctx.fillStyle = lit ? 'rgba(255,190,90,.95)' : col([60,50,40], k); ctx.fillRect(x+8, y+4, 26, 7);
+  ctx.fillStyle = lit ? 'rgba(255,246,220,.98)' : col([230,220,190], k); ctx.fillRect(x+2, y+84, 9, 6);
+  if (lit && train.phase !== 'stop'){ const hg = ctx.createRadialGradient(x,y+86,0,x,y+86,240); hg.addColorStop(0,`rgba(255,236,190,${.38*night})`); hg.addColorStop(1,'rgba(255,236,190,0)'); ctx.fillStyle = hg; ctx.fillRect(x-240,y-150,250,330); }
+  if (lit) glow(x+CAR/2, y+40, 170, '250,212,150', .1*night);
+  const accel = train.phase==='out' || (train.phase==='stop' && train.t > 8.5);
+  if (Math.random() < (accel ? .5 : train.phase==='stop' ? .06 : .12)) puff(x+CAR*.72+3, y-24, 'exhaust');
+}
+function drawCrossing(L, night, active, snowy){
   const x = CROSSING_X, base = 668, k = .25+.75*L;
-  for (let i=0;i<8;i++){ ctx.fillStyle = rgb(shade(i%2 ? [30,30,32] : [226,190,40], k)); ctx.fillRect(x-3, base-112+i*14, 6, 14); }
+  for (let i=0;i<8;i++){ ctx.fillStyle = col(i%2 ? [30,30,32] : [226,190,40], k); ctx.fillRect(x-3, base-112+i*14, 6, 14); }
   ctx.save(); ctx.translate(x, base-126);
-  for (const a of [.62, -.62]){ ctx.save(); ctx.rotate(a); ctx.fillStyle = rgb(shade([30,30,32],k)); ctx.fillRect(-23,-4.5,46,9); ctx.fillStyle = rgb(shade([232,196,44],k)); ctx.fillRect(-21,-3,42,6); ctx.restore(); }
+  for (const a of [.62, -.62]){ ctx.save(); ctx.rotate(a); ctx.fillStyle = col([30,30,32],k); ctx.fillRect(-23,-4.5,46,9); ctx.fillStyle = col([232,196,44],k); ctx.fillRect(-21,-3,42,6); ctx.restore(); }
   ctx.restore();
-  ctx.fillStyle = rgb(shade([40,40,44],k)); ctx.fillRect(x-20, base-104, 40, 4);
+  if (snowy){ ctx.fillStyle = col(C.snow, .4+.6*L, .9); ctx.fillRect(x-20, base-108, 40, 3); }
+  ctx.fillStyle = col([40,40,44],k); ctx.fillRect(x-20, base-104, 40, 4);
   const blink = Math.floor(clock*2.38) % 2;
   for (const [i, dx] of [[0,-13],[1,13]]){
     const lit = active && blink === i;
-    ctx.fillStyle = rgb(shade([30,30,32],k)); ctx.beginPath(); ctx.arc(x+dx, base-94, 8, 0, 7); ctx.fill();
-    ctx.fillStyle = lit ? 'rgba(255,70,50,.98)' : rgb(shade([90,30,28],k)); ctx.beginPath(); ctx.arc(x+dx, base-94, 5.5, 0, 7); ctx.fill();
-    if (lit){ const g = ctx.createRadialGradient(x+dx,base-94,0,x+dx,base-94,40+50*night); g.addColorStop(0,`rgba(255,60,40,${.35+.4*night})`); g.addColorStop(1,'rgba(255,60,40,0)'); ctx.fillStyle = g; ctx.fillRect(x+dx-90,base-184,180,180); }
+    ctx.fillStyle = col([30,30,32],k); ctx.beginPath(); ctx.arc(x+dx, base-94, 8, 0, 7); ctx.fill();
+    ctx.fillStyle = lit ? 'rgba(255,70,50,.98)' : col([90,30,28],k); ctx.beginPath(); ctx.arc(x+dx, base-94, 5.5, 0, 7); ctx.fill();
+    if (lit) glow(x+dx, base-94, 40+60*night, '255,60,40', .35+.4*night);
   }
 }
 function hasGift(i){ return save.preview || Object.values(save.gifts).includes(i); }
-function drawStation(L, night, snowy, info){
-  const x0 = 380, x1 = 600, base = 680, top = 588, k = .2+.8*L;
-  ctx.fillStyle = rgb(shade(C.wood, k)); ctx.fillRect(x0, top, x1-x0, base-top);
-  ctx.fillStyle = rgb(shade(C.plaster, k)); ctx.fillRect(x0+10, top+10, x1-x0-20, 34);
-  for (let i=0;i<6;i++){ ctx.fillStyle = rgb(shade(mix(C.wood,[0,0,0],.25), k)); ctx.fillRect(x0+i*(x1-x0)/6, top+46, 2, base-top-46); }
-  const winLit = night > .35;
-  for (const wx0 of [x0+22, x0+150]){ ctx.fillStyle = winLit ? rgb(C.lit, .9) : rgb(shade(C.glass, .3+.7*L)); ctx.fillRect(wx0, top+52, 46, 30); ctx.fillStyle = rgb(shade(C.wood,k)); ctx.fillRect(wx0+22, top+52, 2, 30); }
-  ctx.fillStyle = winLit ? rgb(mix(C.lit,[120,80,40],.25), .85) : rgb(shade([60,44,34], k)); ctx.fillRect(x0+88, top+50, 40, base-top-50);
-  if (winLit){ const wg = ctx.createRadialGradient(x0+108,base-10,0,x0+108,base-10,140); wg.addColorStop(0,`rgba(248,212,148,${.22*night})`); wg.addColorStop(1,'rgba(248,212,148,0)'); ctx.fillStyle = wg; ctx.fillRect(x0-40,base-150,300,180); }
-  // omiyage posés sur la façade
-  if (hasGift(2)){ const dx = x0+34, dy = top+80; ctx.fillStyle = rgb(shade([196,52,44], .3+.7*L)); ctx.beginPath(); ctx.ellipse(dx, dy-8, 8, 9, 0, 0, 7); ctx.fill(); ctx.fillStyle = rgb(shade([240,232,214], .3+.7*L)); ctx.beginPath(); ctx.arc(dx, dy-10, 4, 0, 7); ctx.fill(); }
-  ctx.fillStyle = rgb(shade(C.roof, k));
-  ctx.beginPath(); ctx.moveTo(x0-30, top+6); ctx.lineTo(x0+40, top-50); ctx.lineTo(x1-40, top-50); ctx.lineTo(x1+30, top+6); ctx.closePath(); ctx.fill();
-  if (snowy){ ctx.fillStyle = rgb(shade([236,240,246], .4+.6*L)); ctx.beginPath(); ctx.moveTo(x0+34, top-50); ctx.lineTo(x1-34, top-50); ctx.lineTo(x1-10, top-28); ctx.lineTo(x0+10, top-28); ctx.closePath(); ctx.fill(); }
+
+/* le bâtiment : salle d'attente en bois, toit de tôle rouge comme à Hokkaidō, poêle l'hiver */
+function drawStation(L, night, snowy, info, temp, wind){
+  const x0 = 360, x1 = 610, base = 680, top = 584, k = .2+.8*L, lit = night > .3;
+  const stove = temp < 10, hour = cur.hour, open = hour >= 5.5 && hour < 23;
+  // murs : planches en bas, enduit et colombages en haut
+  ctx.fillStyle = col(C.plaster, k); ctx.fillRect(x0, top, x1-x0, base-top);
+  ctx.fillStyle = col(C.wood, k); ctx.fillRect(x0, top+58, x1-x0, base-top-58);
+  ctx.fillStyle = col(C.woodDark, k);
+  for (let x=x0; x<x1; x+=9) ctx.fillRect(x, top+58, 1.2, base-top-58);
+  for (const x of [x0, x0+82, x0+168, x1-6]) ctx.fillRect(x, top, 6, base-top);
+  ctx.fillRect(x0, top+54, x1-x0, 5); ctx.fillRect(x0, top, x1-x0, 5);
+  // fenêtres et porte coulissante
+  const winC = lit && open ? `rgba(${C.lit.join(',')},.92)` : col(C.glass, .3+.7*L);
+  for (const wx0 of [x0+16, x1-62]){
+    ctx.fillStyle = winC; ctx.fillRect(wx0, top+14, 46, 34);
+    if (lit && open && stove && wx0 === x0+16) glow(wx0+14, top+44, 26, '255,130,60', .5);
+    ctx.fillStyle = col(C.woodDark, k); ctx.fillRect(wx0+22, top+14, 2, 34); ctx.fillRect(wx0, top+30, 46, 2);
+    if (wx.rain > .1) rainOnGlass(wx0, top+14, 46, 34, L);
+  }
+  const dx0 = x0+96, dw = 64;
+  ctx.fillStyle = lit && open ? `rgba(${mix(C.lit,[150,100,50],.2).join(',')},.9)` : col([58,46,38], k); ctx.fillRect(dx0, top+12, dw, base-top-12);
+  ctx.fillStyle = col(C.woodDark, k); ctx.fillRect(dx0+dw/2-1, top+12, 2, base-top-12); ctx.fillRect(dx0, top+60, dw, 2);
+  if (lit && open){ glow(dx0+dw/2, base, 150, '248,212,148', .28*night); glow(x0+40, base, 90, '248,212,148', .16*night); }
+  // nom de la gare au-dessus de la porte
+  ctx.fillStyle = col([240,236,226], Math.max(k, lit ? .6 : 0)); ctx.fillRect(dx0+4, top-2, dw-8, 12);
+  ctx.fillStyle = col([30,30,34], Math.max(k, lit ? .6 : 0)); ctx.textAlign = 'center'; ctx.font = '700 9px "Shippori Mincho", serif'; ctx.fillText('名残駅', dx0+dw/2, top+7.5); ctx.textAlign = 'left';
+  // tableau à craie (伝言板) et horaires
+  ctx.fillStyle = col([40,64,52], k); ctx.fillRect(x0+18, top+62, 40, 26);
+  ctx.strokeStyle = col([200,206,196], k, .5); ctx.lineWidth = .8; ctx.beginPath(); ctx.moveTo(x0+22, top+70); ctx.lineTo(x0+44, top+69); ctx.moveTo(x0+22, top+78); ctx.lineTo(x0+36, top+78); ctx.stroke();
+  ctx.fillStyle = col([238,236,228], k); ctx.fillRect(x1-56, top+62, 30, 34);
+  ctx.fillStyle = col([60,60,70], k); for (let i=0;i<7;i++) ctx.fillRect(x1-52, top+67+i*4, 10 + (i*7%12), 1.2);
+  // toit de tôle, gouttière, cheminée
+  const rc = C.roof;
+  ctx.fillStyle = col(rc, k);
+  ctx.beginPath(); ctx.moveTo(x0-34, top+8); ctx.lineTo(x0+30, top-46); ctx.lineTo(x1-30, top-46); ctx.lineTo(x1+34, top+8); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = col(mix(rc,[0,0,0],.25), k); for (let x=x0-20; x<x1+20; x+=10) ctx.fillRect(x, top-40 + Math.max(0, (x0+30-x))*.8, 1.2, 40);
+  ctx.fillStyle = col(mix(rc,[0,0,0],.4), k); ctx.fillRect(x0-34, top+6, x1-x0+68, 4);
+  const chX = x1-48;
+  ctx.fillStyle = col([70,70,74], k); ctx.fillRect(chX, top-78, 7, 40); ctx.fillRect(chX-3, top-82, 13, 5);
+  if (stove && open && Math.random() < .12) puff(chX+3, top-84, 'smoke');
+  if (snowy){
+    const t = 3 + snowCover*9;
+    ctx.fillStyle = col(C.snow, .42+.58*L);
+    ctx.beginPath(); ctx.moveTo(x0-30, top+4); ctx.lineTo(x0+30, top-46-t); ctx.lineTo(x1-30, top-46-t); ctx.lineTo(x1+30, top+4); ctx.lineTo(x1+18, top+4); ctx.lineTo(x1-36, top-42); ctx.lineTo(x0+36, top-42); ctx.lineTo(x0-18, top+4); ctx.closePath(); ctx.fill();
+    ctx.fillRect(chX-3, top-86, 13, 4);
+    if (temp < -1){ ctx.fillStyle = col([220,232,246], .5+.5*L, .85); for (let x=x0-28; x<x1+28; x+=13){ const l = 4 + ((x*7)%11); ctx.beginPath(); ctx.moveTo(x, top+10); ctx.lineTo(x+3, top+10); ctx.lineTo(x+1.5, top+10+l); ctx.fill(); } }
+  }
   if (info.cat === 'roof') drawCat('roof', L, night);
-  const wind = 1 + wx.storm*2 + wx.rain*.5 + windNow()*2.5;
-  if (hasGift(0)){ const fx = 566, sw = Math.sin(clock*2.2)*4*wind; ctx.strokeStyle = rgb(shade([60,60,60],k)); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(fx, top+6); ctx.lineTo(fx, top+16); ctx.stroke(); ctx.fillStyle = `rgba(180,214,232,${.55+.3*L})`; ctx.beginPath(); ctx.arc(fx, top+22, 7, Math.PI, 0); ctx.fill(); ctx.strokeStyle = rgb(shade([200,60,60],k)); ctx.beginPath(); ctx.moveTo(fx, top+22); ctx.lineTo(fx+sw*.5, top+32); ctx.stroke(); ctx.fillStyle = rgb(shade([236,226,190],k)); ctx.fillRect(fx-3+sw, top+32, 6, 14); }
-  if (hasGift(1)){ const lx = 456, ly = top+26; if (night>.3){ const lg = ctx.createRadialGradient(lx,ly,0,lx,ly,50); lg.addColorStop(0,`rgba(255,140,90,${.4*night})`); lg.addColorStop(1,'rgba(255,140,90,0)'); ctx.fillStyle = lg; ctx.fillRect(lx-50,ly-50,100,100); } ctx.strokeStyle = rgb(shade([50,50,50],k)); ctx.beginPath(); ctx.moveTo(lx, top+6); ctx.lineTo(lx, ly-12); ctx.stroke(); ctx.fillStyle = night>.3 ? 'rgba(240,96,64,.95)' : rgb(shade([196,52,40],k)); ctx.beginPath(); ctx.ellipse(lx, ly, 9, 13, 0, 0, 7); ctx.fill(); ctx.fillStyle = rgb(shade([30,26,26],k)); ctx.fillRect(lx-6, ly-14, 12, 3); ctx.fillRect(lx-6, ly+11, 12, 3); }
-  if (hasGift(4)){ const tx = 404, sw = Math.sin(clock*1.7+1)*3*wind; ctx.strokeStyle = rgb(shade([60,60,60],k)); ctx.beginPath(); ctx.moveTo(tx, top+6); ctx.lineTo(tx+sw*.4, top+18); ctx.stroke(); ctx.fillStyle = rgb(shade([244,242,236], .35+.65*L)); ctx.beginPath(); ctx.arc(tx+sw*.4, top+22, 6, 0, 7); ctx.fill(); ctx.beginPath(); ctx.moveTo(tx-8+sw*.6, top+38); ctx.lineTo(tx+sw*.4, top+24); ctx.lineTo(tx+8+sw*.6, top+38); ctx.fill(); }
-  if (hasGift(3)){ const bx = 330, by = 668; ctx.fillStyle = rgb(shade([88,64,52],k)); ctx.fillRect(bx-12, by-10, 24, 10); ctx.strokeStyle = rgb(shade([80,60,44],k)); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(bx, by-10); ctx.quadraticCurveTo(bx-6, by-22, bx+4, by-30); ctx.stroke(); ctx.fillStyle = rgb(shade(info.season.season===2 ? [176,72,44] : [58,96,60], k)); ctx.beginPath(); ctx.ellipse(bx+6, by-32, 16, 7, -.2, 0, 7); ctx.fill(); ctx.beginPath(); ctx.ellipse(bx-8, by-24, 10, 5, .2, 0, 7); ctx.fill(); }
-  if (hasGift(5)){ const vx = 1160, vy = 668; ctx.fillStyle = rgb(shade([70,90,110],k)); ctx.beginPath(); ctx.moveTo(vx-7,vy); ctx.lineTo(vx-9,vy-18); ctx.lineTo(vx+9,vy-18); ctx.lineTo(vx+7,vy); ctx.fill(); ctx.strokeStyle = rgb(shade([214,206,170], .3+.7*L)); ctx.lineWidth = 1.4; for (let i=-3;i<=3;i++){ const sw = Math.sin(clock*1.3+i)*3*wind; ctx.beginPath(); ctx.moveTo(vx+i, vy-18); ctx.quadraticCurveTo(vx+i*5, vy-40, vx+i*9+sw, vy-56+Math.abs(i)*3); ctx.stroke(); } }
+  // omiyage posés sur la façade
+  const sway = 1 + wx.storm*2 + wx.rain*.5 + wind*2.5;
+  if (hasGift(2)){ const ddx = x0+88, ddy = base; ctx.fillStyle = col([196,52,44], .3+.7*L); ctx.beginPath(); ctx.ellipse(ddx, ddy-8, 8, 9, 0, 0, 7); ctx.fill(); ctx.fillStyle = col([240,232,214], .3+.7*L); ctx.beginPath(); ctx.arc(ddx, ddy-10, 4, 0, 7); ctx.fill(); }
+  if (hasGift(0)){ const fx = x1+14, sw = Math.sin(clock*2.2)*4*sway; ctx.strokeStyle = col([60,60,60],k); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(fx, top+8); ctx.lineTo(fx, top+18); ctx.stroke(); ctx.fillStyle = `rgba(180,214,232,${.55+.3*L})`; ctx.beginPath(); ctx.arc(fx, top+24, 7, Math.PI, 0); ctx.fill(); ctx.strokeStyle = col([200,60,60],k); ctx.beginPath(); ctx.moveTo(fx, top+24); ctx.lineTo(fx+sw*.5, top+34); ctx.stroke(); ctx.fillStyle = col([236,226,190],k); ctx.fillRect(fx-3+sw, top+34, 6, 14); }
+  if (hasGift(1)){ const lx = x0+70, ly = top+26; if (night>.3) glow(lx, ly, 50, '255,140,90', .4*night); ctx.strokeStyle = col([50,50,50],k); ctx.beginPath(); ctx.moveTo(lx, top+8); ctx.lineTo(lx, ly-12); ctx.stroke(); ctx.fillStyle = night>.3 ? 'rgba(240,96,64,.95)' : col([196,52,40],k); ctx.beginPath(); ctx.ellipse(lx, ly, 9, 13, 0, 0, 7); ctx.fill(); ctx.fillStyle = col([30,26,26],k); ctx.fillRect(lx-6, ly-14, 12, 3); ctx.fillRect(lx-6, ly+11, 12, 3); }
+  if (hasGift(4)){ const tx = x0-14, sw = Math.sin(clock*1.7+1)*3*sway; ctx.strokeStyle = col([60,60,60],k); ctx.beginPath(); ctx.moveTo(tx, top+8); ctx.lineTo(tx+sw*.4, top+20); ctx.stroke(); ctx.fillStyle = col([244,242,236], .35+.65*L); ctx.beginPath(); ctx.arc(tx+sw*.4, top+24, 6, 0, 7); ctx.fill(); ctx.beginPath(); ctx.moveTo(tx-8+sw*.6, top+40); ctx.lineTo(tx+sw*.4, top+26); ctx.lineTo(tx+8+sw*.6, top+40); ctx.fill(); }
+  if (hasGift(3)){ const bx = 338, by = 668; ctx.fillStyle = col([88,64,52],k); ctx.fillRect(bx-12, by-10, 24, 10); ctx.strokeStyle = col([80,60,44],k); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(bx, by-10); ctx.quadraticCurveTo(bx-6, by-22, bx+4, by-30); ctx.stroke(); ctx.fillStyle = col(info.season.season===2 ? [176,72,44] : [58,96,60], k); ctx.beginPath(); ctx.ellipse(bx+6, by-32, 16, 7, -.2, 0, 7); ctx.fill(); ctx.beginPath(); ctx.ellipse(bx-8, by-24, 10, 5, .2, 0, 7); ctx.fill(); }
+  if (hasGift(5)){ const vx = 1160, vy = 668; ctx.fillStyle = col([70,90,110],k); ctx.beginPath(); ctx.moveTo(vx-7,vy); ctx.lineTo(vx-9,vy-18); ctx.lineTo(vx+9,vy-18); ctx.lineTo(vx+7,vy); ctx.fill(); ctx.strokeStyle = col([214,206,170], .3+.7*L); ctx.lineWidth = 1.4; for (let i=-3;i<=3;i++){ const sw = Math.sin(clock*1.3+i)*3*sway; ctx.beginPath(); ctx.moveTo(vx+i, vy-18); ctx.quadraticCurveTo(vx+i*5, vy-40, vx+i*9+sw, vy-56+Math.abs(i)*3); ctx.stroke(); } }
 }
-function drawLamp(L, night, on){
-  const x = 670, base = 680, top = 560;
-  ctx.fillStyle = rgb(shade([46,48,54], .25+.75*L)); ctx.fillRect(x-3, top, 6, base-top); ctx.fillRect(x-14, top-4, 28, 6);
-  ctx.fillStyle = on ? 'rgba(255,232,170,.95)' : rgb(shade([90,92,96], .3+.7*L)); ctx.fillRect(x-6, top+2, 12, 5);
+/* gouttes qui coulent sur une vitre */
+function rainOnGlass(x, y, w, h, L){
+  ctx.fillStyle = `rgba(210,222,240,${.35*(.4+.6*L)})`;
+  for (let i=0;i<7;i++){ const px = x + 3 + ((i*13.7) % (w-6)), py = y + ((clock*12*(1+i%3) + i*17) % h); ctx.fillRect(px, Math.max(y, py-6), 1, Math.min(6, py - y)); ctx.beginPath(); ctx.arc(px+.5, py, 1.2, 0, 7); ctx.fill(); }
+}
+/* le distributeur de boissons : la lumière froide du quai la nuit */
+function drawVending(L, night, snowy){
+  const x = 620, y = 606, w = 34, h = 74, k = .25+.75*L;
+  ctx.fillStyle = col(C.vend, k); ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = col([236,240,244], k); ctx.fillRect(x+3, y+4, w-6, 34);
+  const DR = [[200,60,50],[60,120,190],[230,180,60],[80,150,90],[240,240,240],[150,90,60]];
+  for (let r=0;r<3;r++) for (let c=0;c<5;c++){ ctx.fillStyle = col(DR[(r*5+c)%6], k); ctx.fillRect(x+5+c*5, y+7+r*11, 3, 8); }
+  ctx.fillStyle = col([30,34,40], k); ctx.fillRect(x+6, y+56, w-12, 10); ctx.fillRect(x+w-9, y+42, 4, 8);
+  const on = night > .2;
+  if (on){ ctx.fillStyle = `rgba(220,240,255,${.45*night})`; ctx.fillRect(x+3, y+4, w-6, 34); glow(x+w/2, y+30, 90, '200,232,250', .3*night); glow(x+w/2, 684, 70, '200,232,250', .2*night); }
+  if (snowy){ ctx.fillStyle = col(C.snow, .42+.58*L); ctx.beginPath(); ctx.ellipse(x+w/2, y, w/2+3, 3+snowCover*3, 0, Math.PI, 0); ctx.fill(); }
+}
+function drawMailbox(L, snowy){
+  const x = 300, k = .25+.75*L;
+  ctx.fillStyle = col([60,60,64], k); ctx.fillRect(x-2, 650, 4, 30);
+  ctx.fillStyle = col([196,44,38], k); ctx.beginPath(); ctx.moveTo(x-11, 660); ctx.lineTo(x-11, 630); ctx.quadraticCurveTo(x, 618, x+11, 630); ctx.lineTo(x+11, 660); ctx.fill();
+  ctx.fillStyle = col([40,30,30], k); ctx.fillRect(x-7, 634, 14, 2.5);
+  ctx.fillStyle = col([240,236,226], k); ctx.fillRect(x-5, 644, 10, 7);
+  if (snowy){ ctx.fillStyle = col(C.snow, .42+.58*L); ctx.beginPath(); ctx.ellipse(x, 624, 13, 4+snowCover*3, 0, Math.PI, 0); ctx.fill(); }
+}
+function drawLamp(L, night, on, snowy){
+  const x = 694, base = 680, top = 556;
+  ctx.fillStyle = col([46,48,54], .25+.75*L); ctx.fillRect(x-3, top, 6, base-top); ctx.fillRect(x-18, top-4, 36, 6);
+  ctx.fillStyle = on ? 'rgba(255,236,186,.98)' : col([90,92,96], .3+.7*L); ctx.fillRect(x-14, top+2, 28, 4);
+  if (snowy){ ctx.fillStyle = col(C.snow, .42+.58*L); ctx.fillRect(x-19, top-8, 38, 4); }
   if (on && night > .15){
-    let lg = ctx.createRadialGradient(x,top+4,0,x,top+4,70); lg.addColorStop(0,`rgba(255,226,160,${.75*night})`); lg.addColorStop(1,'rgba(255,226,160,0)'); ctx.fillStyle = lg; ctx.fillRect(x-70,top-66,140,140);
-    lg = ctx.createRadialGradient(x,682,0,x,682,120); lg.addColorStop(0,`rgba(255,226,160,${.32*night})`); lg.addColorStop(1,'rgba(255,226,160,0)'); ctx.fillStyle = lg; ctx.beginPath(); ctx.ellipse(x,682,130,24,0,0,7); ctx.fill();
+    glow(x, top+4, 80, '255,226,160', .75*night);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const cone = ctx.createLinearGradient(0, top, 0, base);
+    cone.addColorStop(0, `rgba(255,220,150,${.16*night})`); cone.addColorStop(1, 'rgba(255,220,150,0)');
+    ctx.fillStyle = cone; ctx.beginPath(); ctx.moveTo(x-12, top+5); ctx.lineTo(x+12, top+5); ctx.lineTo(x+80, base+4); ctx.lineTo(x-80, base+4); ctx.fill();
+    ctx.restore();
+    const lg = ctx.createRadialGradient(x,684,0,x,684,130); lg.addColorStop(0,`rgba(255,226,160,${.34*night})`); lg.addColorStop(1,'rgba(255,226,160,0)'); ctx.fillStyle = lg; ctx.beginPath(); ctx.ellipse(x,684,140,22,0,0,7); ctx.fill();
   }
 }
-function drawBench(L){ ctx.fillStyle = rgb(shade(C.bench, .2+.8*L)); ctx.fillRect(730, 662, 90, 5); ctx.fillRect(730, 650, 90, 4); ctx.fillRect(736, 667, 4, 15); ctx.fillRect(810, 667, 4, 15); }
+function drawBench(L, snowy){
+  const k = .2+.8*L;
+  ctx.fillStyle = col(mix(C.bench,[0,0,0],.25), k); ctx.fillRect(744, 667, 4, 15); ctx.fillRect(824, 667, 4, 15); ctx.fillRect(744, 640, 4, 27); ctx.fillRect(824, 640, 4, 27);
+  ctx.fillStyle = col(C.bench, k); ctx.fillRect(740, 661, 92, 6); ctx.fillRect(740, 642, 92, 4); ctx.fillRect(740, 650, 92, 4);
+  if (snowy && !(cur.hour >= 13 && cur.hour < 13.7)){ ctx.fillStyle = col(C.snow, .42+.58*L); ctx.fillRect(740, 657, 92, 4); ctx.fillRect(740, 639, 92, 3); }
+}
 function drawBowl(L){
-  const x = 628, y = 683, full = save.fed === dayKey(cur.y,cur.m,cur.d) && cur.hour < save.fedHour + 0.75;
-  ctx.fillStyle = rgb(shade([170,60,52], .3+.7*L)); ctx.beginPath(); ctx.ellipse(x, y, 11, 4, 0, 0, 7); ctx.fill();
-  if (full){ ctx.fillStyle = rgb(shade([150,110,70], .3+.7*L)); ctx.beginPath(); ctx.ellipse(x, y-2, 8, 2.5, 0, 0, 7); ctx.fill(); }
+  const x = 668, y = 683, full = save.fed === dayKey(cur.y,cur.m,cur.d) && cur.hour < save.fedHour + 0.75;
+  ctx.fillStyle = col([170,60,52], .3+.7*L); ctx.beginPath(); ctx.ellipse(x, y, 11, 4, 0, 0, 7); ctx.fill();
+  if (full){ ctx.fillStyle = col([150,110,70], .3+.7*L); ctx.beginPath(); ctx.ellipse(x, y-2, 8, 2.5, 0, 0, 7); ctx.fill(); }
 }
 function drawItem(L, item){
-  if (!item) return; const x = 826, y = 662, k = .3+.7*L;
-  if (item.idx === 0){ ctx.strokeStyle = rgb(shade([44,64,96],k)); ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x, y-30); ctx.lineTo(x+8, y+18); ctx.stroke(); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x+11, y+18, 3, 0, Math.PI); ctx.stroke(); }
-  else if (item.idx === 1){ ctx.fillStyle = rgb(shade([214,200,150],k)); ctx.fillRect(x-14, y-3, 14, 6); }
-  else if (item.idx === 2){ ctx.fillStyle = rgb(shade([186,44,44],k)); ctx.fillRect(x-20, y-3, 22, 4); ctx.fillRect(x, y-3, 4, 14); }
-  else { ctx.fillStyle = rgb(shade([70,80,60],k)); ctx.fillRect(x-14, y-5, 13, 5); }
+  if (!item) return; const x = 836, y = 662, k = .3+.7*L;
+  if (item.idx === 0){ ctx.strokeStyle = col([44,64,96],k); ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x, y-30); ctx.lineTo(x+8, y+18); ctx.stroke(); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x+11, y+18, 3, 0, Math.PI); ctx.stroke(); }
+  else if (item.idx === 1){ ctx.fillStyle = col([214,200,150],k); ctx.fillRect(x-24, y-3, 14, 6); }
+  else if (item.idx === 2){ ctx.fillStyle = col([186,44,44],k); ctx.fillRect(x-30, y-3, 22, 4); ctx.fillRect(x-10, y-3, 4, 14); }
+  else { ctx.fillStyle = col([70,80,60],k); ctx.fillRect(x-24, y-5, 13, 5); }
 }
 function drawDebris(L, season, info){
-  const amount = info.debris; if (amount <= .02) return;
-  const n = Math.floor(LEAVES.length * amount), col = DEBRIS[season], cut = sweep ? 262 + sweep.t/1.2*930 : -1;
-  ctx.fillStyle = rgb(shade(col, .3+.7*L));
+  const amount = info.debris * (1 - clamp(snowCover*1.6, 0, 1)); if (amount <= .02) return;
+  const n = Math.floor(LEAVES.length * amount), c = DEBRIS[season], cut = sweep ? 240 + sweep.t/1.2*960 : -1;
+  ctx.fillStyle = col(c, .3+.7*L);
   for (let i=0;i<n;i++){ const l = LEAVES[i]; if (l.x < cut) continue; ctx.save(); ctx.translate(l.x, l.y); ctx.rotate(l.a); ctx.beginPath(); ctx.ellipse(0,0,3.4*l.s,1.8*l.s,0,0,7); ctx.fill(); ctx.restore(); }
-  if (sweep){ ctx.strokeStyle = rgb(shade([150,120,70], .3+.7*L)); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(cut, 650); ctx.lineTo(cut+8, 686); ctx.stroke(); }
+  if (sweep){ ctx.strokeStyle = col([150,120,70], .3+.7*L); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(cut, 650); ctx.lineTo(cut+8, 686); ctx.stroke(); }
 }
-function drawSign(L, night){
+function drawSign(L, night, snowy){
   const x0 = 860, y0 = 604, w = 150, h = 46, k = Math.max(.25+.75*L, night > .35 ? .75 : 0);
-  ctx.fillStyle = rgb(shade([60,60,64], .25+.75*L)); ctx.fillRect(x0+18, y0+h, 4, 682-y0-h); ctx.fillRect(x0+w-22, y0+h, 4, 682-y0-h);
-  ctx.fillStyle = rgb(shade(C.sign, k)); ctx.fillRect(x0, y0, w, h);
-  ctx.fillStyle = rgb(shade(C.signBar, k)); ctx.fillRect(x0, y0+h-9, w, 9);
-  ctx.fillStyle = rgb(shade([30,32,38], k)); ctx.textAlign = 'center';
+  ctx.fillStyle = col([60,60,64], .25+.75*L); ctx.fillRect(x0+18, y0+h, 4, 682-y0-h); ctx.fillRect(x0+w-22, y0+h, 4, 682-y0-h);
+  ctx.fillStyle = col(C.sign, k); ctx.fillRect(x0, y0, w, h);
+  ctx.fillStyle = col(C.signBar, k); ctx.fillRect(x0, y0+h-9, w, 9);
+  ctx.fillStyle = col([30,32,38], k); ctx.textAlign = 'center';
   ctx.font = '500 9px "Zen Kaku Gothic New", sans-serif'; ctx.fillText('なごり', x0+w/2, y0+11);
   ctx.font = '700 20px "Shippori Mincho", serif'; ctx.fillText('名残', x0+w/2, y0+30);
-  ctx.fillStyle = rgb(shade([240,240,236], k)); ctx.font = '500 7px "Zen Kaku Gothic New", sans-serif'; ctx.fillText('Nagori', x0+w/2, y0+h-2.5);
+  ctx.fillStyle = col([240,240,236], k); ctx.font = '500 7px "Zen Kaku Gothic New", sans-serif'; ctx.fillText('Nagori', x0+w/2, y0+h-2.5);
   ctx.textAlign = 'left'; ctx.fillText('←', x0+6, y0+h-2.5); ctx.textAlign = 'right'; ctx.fillText('→', x0+w-6, y0+h-2.5); ctx.textAlign = 'left';
+  if (snowy){ ctx.fillStyle = col(C.snow, .42+.58*L); ctx.beginPath(); ctx.ellipse(x0+w/2, y0, w/2+2, 3+snowCover*3, 0, Math.PI, 0); ctx.fill(); }
 }
 function drawCat(spot, L, night){
-  const [x,y] = CAT_POS[spot], k = .3+.7*L, col = rgb(shade([66,58,54],k));
-  ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineCap = 'round';
+  const [x,y] = CAT_POS[spot], k = .3+.7*L, c = col([66,58,54],k);
+  ctx.fillStyle = c; ctx.strokeStyle = c; ctx.lineCap = 'round';
   if (spot === 'bowl'){
     ctx.beginPath(); ctx.ellipse(x+12, y-9, 10, 8, 0, 0, 7); ctx.fill();
     ctx.beginPath(); ctx.arc(x+2, y-6, 5, 0, 7); ctx.fill();
@@ -447,50 +572,137 @@ function drawCat(spot, L, night){
     if (night > .4){ ctx.fillStyle = 'rgba(214,236,140,.8)'; ctx.fillRect(x-13, y-10, 1.6, 1); }
   }
 }
+
+/* personnages : silhouettes de profil à deux tons, chacun avec son objet */
+const LOOK = {
+  traveler: { coat:[52,58,78], coat2:[42,46,62], scarf:[150,64,58], hair:[34,30,30], h:1 },
+  kid:      { coat:[32,34,44], coat2:[24,26,34], scarf:[60,90,150], hair:[22,20,22], h:.9 },
+  lady:     { coat:[112,84,104], coat2:[92,68,86], scarf:[180,160,120], hair:[196,196,200], h:.84 },
+  worker:   { coat:[52,64,92], coat2:[40,50,74], scarf:[230,120,40], hair:[30,30,30], h:.92 }
+};
 function figure(p, y, L, night){
-  const k = .3+.7*L;
+  const k = .32+.68*L, look = LOOK[p.kind], winter = tempNow() < 6;
   ctx.save(); ctx.globalAlpha = Math.max(0, p.fade == null ? 1 : p.fade); ctx.translate(p.x, y);
-  const sc = p.kind==='kid' ? .7 : p.kind==='lady' ? .86 : p.kind==='worker' ? .82 : 1; ctx.scale(sc*(p.face===1?-1:1), sc);
-  const coat = { traveler:[44,50,64], kid:[40,52,86], lady:[96,66,90], worker:[64,70,78] }[p.kind];
-  const col = rgb(shade(coat,k)); ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = 5; ctx.lineCap = 'round';
+  const sc = look.h; ctx.scale(sc*(p.face===1?-1:1), sc);
+  const C1 = col(look.coat,k), C2 = col(look.coat2,k), skin = col([214,182,150],k), hair = col(look.hair,k);
   const ph = p.phase != null ? p.phase : clock*7;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (night > .3) { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(0, 1, 13, 3, 0, 0, 7); ctx.fill(); }
   if (p.sit){
-    ctx.beginPath(); ctx.moveTo(-2,-18); ctx.lineTo(12,-18); ctx.lineTo(14,0); ctx.stroke();
-    if (p.kind==='lady'){ ctx.beginPath(); ctx.moveTo(-10,-46); ctx.quadraticCurveTo(2,-54,10,-44); ctx.lineTo(10,-18); ctx.lineTo(-10,-16); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.arc(4,-52,6.5,0,7); ctx.fill(); ctx.fillStyle = rgb(shade([180,180,184],k)); ctx.beginPath(); ctx.arc(1,-57,3.5,0,7); ctx.fill(); ctx.fillStyle = rgb(shade([46,66,110],k)); ctx.fillRect(4,-24,14,10); }
-    else { ctx.beginPath(); ctx.moveTo(-10,-50); ctx.lineTo(8,-50); ctx.lineTo(10,-18); ctx.lineTo(-10,-16); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.arc(0,-58,7,0,7); ctx.fill(); ctx.fillStyle = rgb(shade([92,64,46],k)); ctx.fillRect(18,-14,14,12); }
+    ctx.strokeStyle = C2; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(-2,-20); ctx.lineTo(13,-20); ctx.lineTo(14,-2); ctx.stroke();
+    ctx.fillStyle = col([30,28,30],k); ctx.fillRect(12,-3,8,3);
+    ctx.fillStyle = C1; ctx.beginPath(); ctx.moveTo(-10,-54); ctx.quadraticCurveTo(0,-60,8,-52); ctx.lineTo(10,-20); ctx.lineTo(-11,-18); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = C2; ctx.beginPath(); ctx.moveTo(2,-48); ctx.quadraticCurveTo(10,-36,16,-26); ctx.lineTo(12,-23); ctx.quadraticCurveTo(4,-34,-1,-44); ctx.fill();
+    ctx.fillStyle = col(look.scarf,k); ctx.fillRect(-7,-56,14,5);
+    ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(1,-63,7,0,7); ctx.fill();
+    ctx.fillStyle = hair; ctx.beginPath(); ctx.arc(-1,-65,7.4,Math.PI*.95,Math.PI*2.05); ctx.fill();
+    if (p.kind==='lady'){ ctx.beginPath(); ctx.arc(-5,-69,3.6,0,7); ctx.fill(); ctx.fillStyle = col([60,92,140],k); ctx.fillRect(6,-30,15,11); ctx.fillStyle = col([230,220,190],k); ctx.fillRect(10,-30,3,11); }
+    else { ctx.fillStyle = col([110,74,50],k); ctx.fillRect(20,-16,16,14); ctx.fillStyle = col([80,52,36],k); ctx.fillRect(26,-19,4,3); }
   } else {
-    const a = p.walk ? Math.sin(ph)*.4 : 0;
-    for (const s of [1,-1]){ ctx.beginPath(); ctx.moveTo(0,-26); ctx.lineTo(Math.sin(a*s)*14, 0); ctx.stroke(); }
-    if (p.kind==='lady'){ ctx.beginPath(); ctx.moveTo(-8,-50); ctx.quadraticCurveTo(4,-58,11,-46); ctx.lineTo(12,-22); ctx.lineTo(-11,-22); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.arc(-6,-55,6.5,0,7); ctx.fill(); ctx.fillStyle = rgb(shade([180,180,184],k)); ctx.beginPath(); ctx.arc(-9,-60,3.5,0,7); ctx.fill(); }
-    else { ctx.beginPath(); ctx.moveTo(-9,-56); ctx.lineTo(9,-56); ctx.lineTo(12,-22); ctx.lineTo(-12,-22); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.arc(0,-63,7,0,7); ctx.fill(); }
-    if (p.kind==='kid'){ ctx.fillStyle = rgb(shade([236,196,52],k)); ctx.beginPath(); ctx.arc(0,-66,8,Math.PI,0); ctx.fill(); ctx.fillRect(-10,-66,20,2.5); ctx.fillStyle = rgb(shade([178,40,40],k)); ctx.fillRect(7,-54,9,18); }
-    if (p.kind==='traveler'){ ctx.fillStyle = rgb(shade([92,64,46],k)); ctx.fillRect(10,-24,12,11); if (wx.rain > .3){ ctx.strokeStyle = rgb(shade([40,44,60],k)); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-4,-50); ctx.lineTo(-4,-84); ctx.stroke(); ctx.fillStyle = rgb(shade([70,40,52],k)); ctx.beginPath(); ctx.arc(-4,-84,24,Math.PI,0); ctx.fill(); } }
-    if (p.kind==='worker'){ ctx.fillStyle = rgb(shade([236,236,232],k)); ctx.beginPath(); ctx.arc(0,-67,8,Math.PI,0); ctx.fill(); ctx.fillStyle = rgb(shade([226,120,40],k)); ctx.fillRect(-10,-50,20,4); if (p.lantern){ ctx.fillStyle = 'rgba(255,214,140,.95)'; ctx.fillRect(-18,-30,7,9); const lg = ctx.createRadialGradient(-14,-26,0,-14,-26,60); lg.addColorStop(0,'rgba(255,214,140,.45)'); lg.addColorStop(1,'rgba(255,214,140,0)'); ctx.fillStyle = lg; ctx.fillRect(-74,-86,120,120); } }
+    const a = p.walk ? Math.sin(ph)*.42 : 0, bob = p.walk ? Math.abs(Math.sin(ph))*1.5 : 0;
+    ctx.translate(0, -bob);
+    for (const s of [1,-1]){ ctx.strokeStyle = s>0 ? C2 : C1; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(0,-28); ctx.lineTo(Math.sin(a*s)*13, -1); ctx.stroke(); ctx.fillStyle = col([30,28,30],k); ctx.fillRect(Math.sin(a*s)*13-3, -3, 8, 3); }
+    const lean = p.kind==='lady' ? 4 : 0;
+    ctx.fillStyle = C1; ctx.beginPath();
+    if (p.kind==='kid'){ ctx.moveTo(-9,-58); ctx.lineTo(9,-58); ctx.lineTo(10,-26); ctx.lineTo(-10,-26); }
+    else { ctx.moveTo(-9+lean,-58); ctx.quadraticCurveTo(lean,-62,9+lean,-58); ctx.lineTo(13,-22); ctx.lineTo(-12,-22); }
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = C2; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(2+lean,-54); ctx.lineTo(4+lean - a*10, -34); ctx.stroke();
+    if (winter || p.kind==='worker'){ ctx.fillStyle = col(look.scarf,k); ctx.fillRect(-7+lean,-61,14,(p.kind==='worker'?0:5)); }
+    ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(1+lean,-67,7,0,7); ctx.fill();
+    ctx.fillStyle = hair; ctx.beginPath(); ctx.arc(-1+lean,-69,7.4,Math.PI*.95,Math.PI*2.05); ctx.fill();
+    if (p.kind==='lady'){ ctx.beginPath(); ctx.arc(-5+lean,-73,3.6,0,7); ctx.fill(); ctx.strokeStyle = col([80,60,44],k); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(12,-36); ctx.lineTo(18,-1); ctx.stroke(); ctx.fillStyle = col([60,92,140],k); ctx.fillRect(-14,-36,12,10); }
+    if (p.kind==='kid'){ ctx.fillStyle = col([200,200,204],k); ctx.fillRect(-2,-58,6,3); ctx.strokeStyle = col([40,60,110],k); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-6,-57); ctx.lineTo(10,-34); ctx.stroke(); ctx.fillStyle = col([40,60,110],k); ctx.fillRect(6,-38,13,11); }
+    if (p.kind==='traveler'){
+      ctx.strokeStyle = col([40,40,44],k); ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(14,-34); ctx.lineTo(16,-14); ctx.stroke();
+      ctx.fillStyle = col([110,74,50],k); ctx.fillRect(13,-16,15,15);
+      if (wx.rain > .3){ ctx.strokeStyle = col([40,44,60],k); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-3,-54); ctx.lineTo(-3,-92); ctx.stroke(); ctx.fillStyle = col([70,40,52],k); ctx.beginPath(); ctx.arc(-3,-92,24,Math.PI,0); ctx.fill(); }
+    }
+    if (p.kind==='worker'){
+      ctx.fillStyle = col([238,238,232],k); ctx.beginPath(); ctx.arc(1,-71,8.4,Math.PI,0); ctx.fill(); ctx.fillRect(-8,-71,18,2.5);
+      ctx.fillStyle = col([236,124,40],k); ctx.fillRect(-9,-56,18,4); ctx.fillRect(-10,-44,20,3);
+      ctx.strokeStyle = col([90,90,96],k); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(6,-34); ctx.lineTo(16,-50); ctx.stroke(); ctx.fillStyle = col([90,90,96],k); ctx.fillRect(13,-54,8,4);
+      if (p.lantern){ ctx.fillStyle = 'rgba(255,214,140,.95)'; ctx.fillRect(-20,-32,7,9); glow(-16,-28,70,'255,214,140',.5); }
+    }
+    if (winter && tempNow() < 3 && Math.random() < .02) puff(p.x + (p.face===1?-8:8)*sc, y - 66*sc, 'breath');
   }
   ctx.restore();
 }
-function drawGarden(L, season, snowy){
-  const bx = 1010, by = 770, bw = 170;
-  ctx.fillStyle = rgb(shade(C.soil, .2+.8*L)); ctx.beginPath(); ctx.ellipse(bx+bw/2, by+12, bw/2, 16, 0, 0, 7); ctx.fill();
-  ctx.fillStyle = rgb(shade([108,82,58], .2+.8*L)); for (let i=0;i<7;i++) ctx.fillRect(bx-6+i*30, by-20, 5, 34);
-  ctx.fillRect(bx-6, by-12, 186, 3);
+/* herbes du premier plan, selon la saison */
+function drawTufts(L, season, snowy, wind){
+  const c = snowy ? [180,190,200] : season===2 ? [168,140,90] : season===3 ? [130,130,120] : [70,110,64];
+  ctx.strokeStyle = col(c, .25+.6*L, snowy ? .5 : .9); ctx.lineWidth = 1.4;
+  for (const t of GRASS_TUFTS){ const sw = Math.sin(clock*1.2 + t.s*6)*(1+wind*3); ctx.beginPath(); for (const d of [-3,0,3]){ ctx.moveTo(t.x+d, t.y); ctx.quadraticCurveTo(t.x+d+sw*.5, t.y-t.h*.6, t.x+d*1.6+sw, t.y-t.h); } ctx.stroke(); }
+  if (season===2 && !snowy){ ctx.fillStyle = col([220,206,170], .3+.6*L, .9); for (const t of GRASS_TUFTS) if (t.s > .7){ const sw = Math.sin(clock*1.2 + t.s*6)*(1+wind*3); ctx.beginPath(); ctx.ellipse(t.x+sw*1.3, t.y-t.h-4, 2, 6, .3, 0, 7); ctx.fill(); } }
+}
+/* le jardin, au premier plan devant la lampe */
+function drawGarden(L, season, snowy, wind){
+  const bx = 560, by = 768, bw = 180;
+  ctx.fillStyle = col(C.soil, .2+.8*L); ctx.beginPath(); ctx.ellipse(bx+bw/2, by+12, bw/2, 15, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = col([108,82,58], .2+.8*L); for (let i=0;i<7;i++) ctx.fillRect(bx-4+i*31, by-18, 5, 32);
+  ctx.fillRect(bx-4, by-10, 192, 3);
+  if (snowy){ ctx.fillStyle = col(C.snow, .42+.58*L); ctx.beginPath(); ctx.ellipse(bx+bw/2, by+8, bw/2, 9+snowCover*4, 0, 0, 7); ctx.fill(); for (let i=0;i<7;i++) ctx.fillRect(bx-5+i*31, by-21, 7, 3); }
   const g = Math.min(14, save.growth), px = bx+bw/2, hgt = 28 + g*6;
-  ctx.strokeStyle = rgb(shade([70,92,56], .25+.75*L)); ctx.lineWidth = 3; ctx.lineCap = 'round';
-  const sway = Math.sin(clock*.8)*2*(1+wx.storm*2+windNow()*2);
+  ctx.strokeStyle = col([70,92,56], .25+.75*L); ctx.lineWidth = 3; ctx.lineCap = 'round';
+  const sway = Math.sin(clock*.8)*2*(1+wx.storm*2+wind*2);
   ctx.beginPath(); ctx.moveTo(px, by+8); ctx.quadraticCurveTo(px-6, by-hgt*.5, px+sway, by-hgt); ctx.stroke();
   const branches = 2 + Math.floor(g/2);
   for (let i=0;i<branches;i++){
     const t = .35 + i/(branches+1)*.6, yy = by - hgt*t, dir = i%2 ? 1 : -1, len = 14 + g*1.2, bx2 = px+sway*t+dir*len;
     ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(px+sway*t, yy); ctx.lineTo(bx2, yy-8); ctx.stroke();
-    if (season !== 3){ ctx.fillStyle = rgb(shade(FOLIAGE[season], .25+.75*L)); ctx.beginPath(); ctx.ellipse(bx2, yy-10, 9, 6, dir*.4, 0, 7); ctx.fill(); }
-    if (season===0 && i%2===0){ ctx.fillStyle = rgb(shade([240,186,198], .3+.7*L)); ctx.beginPath(); ctx.arc(bx2-dir*6, yy-16, 3.5, 0, 7); ctx.fill(); }
-    if (snowy){ ctx.fillStyle = rgb(shade([240,244,248], .4+.6*L)); ctx.fillRect(bx2-6, yy-12, 10, 3); }
+    if (season !== 3){ ctx.fillStyle = col(FOLIAGE[season], .25+.75*L); ctx.beginPath(); ctx.ellipse(bx2, yy-10, 9, 6, dir*.4, 0, 7); ctx.fill(); }
+    if (season===0 && i%2===0){ ctx.fillStyle = col([240,186,198], .3+.7*L); ctx.beginPath(); ctx.arc(bx2-dir*6, yy-16, 3.5, 0, 7); ctx.fill(); }
+    if (snowy){ ctx.fillStyle = col(C.snow, .42+.58*L); ctx.fillRect(bx2-6, yy-12, 10, 3); }
   }
   if (water){
     water.t += .016; ctx.fillStyle = 'rgba(170,210,240,.85)';
     for (let i=0;i<12;i++){ const k = (water.t*1.6 + i/12) % 1; ctx.beginPath(); ctx.arc(px-40 + i*7 + k*10, by - hgt - 30 + k*(hgt+30), 2.2, 0, 7); ctx.fill(); }
     if (water.t > 1.4) water = null;
   }
+}
+
+/* ---------- État ---------- */
+let real = null;
+const wx = { cloud:.3, rain:0, snow:0, fog:0, storm:0 };
+let flash = 0, lastFrame = performance.now(), clock = 0;
+const train = { phase:'idle', x:2000, t:0, stop:true, traveler:false };
+const STOP_X = 560, CAR = 300, GAP = 0;
+const trav = { state:'none', x:0, walk:0, alpha:1 };
+let water = null, sweep = null, purr = null, lastTrainKey = null, panelStep = 0, cur = null;
+
+function kindNow(){ if (sim.weather !== 'auto') return sim.weather; return real ? real.kind : 'partly'; }
+
+/* ---------- Trains ---------- */
+/* la sonnerie du passage à niveau commence avant que le train n'apparaisse (t négatif) */
+const BELL_LEAD = 8, CROSSING_X = 1262, PX_PER_M = 12.9;
+function startTrain(opts){ if (train.phase !== 'idle') return false; Object.assign(train, {phase: opts.stop ? 'in' : 'pass', t:-BELL_LEAD, x:1750, prevX:1750, v:0, stop:opts.stop, traveler:!!opts.traveler, said:{}}); return true; }
+const easeOut = t => 1-Math.pow(1-t,3), easeIn = t => t*t*t;
+function updateTrain(dt){
+  if (train.phase==='idle') return;
+  train.t += dt;
+  const T0 = Math.max(0, train.t), once = k => { if (train.said[k]) return false; train.said[k] = true; return true; };
+  const pan = clamp((train.x + CAR/2 - 790) / 900, -1, 1);
+  if (train.phase==='pass'){ train.x = 1750 - T0*300; if (train.t > -1.2 && once('horn')) son.event('horn', {pan: .8}); if (train.x < -800) train.phase='idle'; }
+  else if (train.phase==='in'){ const k=Math.min(1,T0/7); train.x = 1750 + (STOP_X-1750)*easeOut(k); if (k > .55 && once('brake')) son.event('brake', {pan}); if (k>=1){ train.phase='stop'; train.t=0; son.event('hiss', {pan}); son.event('doors', {pan, delay: .9}); } }
+  else if (train.phase==='stop'){ if (train.traveler && train.t>2.2 && trav.state==='none'){ trav.state='walk'; trav.x=STOP_X+CAR-24; trav.alpha=1; train.traveler=false; } if (train.t > 7.6 && once('close')) son.event('doors', {pan}); if (train.t>9){ train.phase='out'; train.t=0; train.said = {}; } }
+  else if (train.phase==='out'){ const k=Math.min(1,T0/7); train.x = STOP_X + (-700-STOP_X)*easeIn(k); if (k>=1) train.phase='idle'; }
+  train.v = dt > 0 ? Math.abs(train.x - train.prevX) / dt : 0; train.prevX = train.x;
+}
+/* la sonnerie sonne tant que le train n'a pas franchi le passage à niveau (à droite du quai) */
+function crossingActive(){
+  if (train.phase==='in') return train.x + CAR > CROSSING_X - 40;
+  if (train.phase==='pass') return train.x + CAR > CROSSING_X - 40;
+  return false;
+}
+function travelerState(w){
+  const s = seasonOf(w.y,w.m,w.d), tv = travelerOf(s);
+  const welcomed = save.gifts[tv.key] != null;
+  const arrived = save.arrived[tv.key] || idx(w.y,w.m,w.d,w.hour) >= tv.at;
+  return { s, tv, welcomed, waiting: arrived && !welcomed };
+}
+function updateTraveler(dt){
+  if (trav.state==='walk'){ trav.x -= 38*dt; trav.walk += dt*7; if (trav.x <= 750){ trav.state='none'; const st = travelerState(worldTime()); save.arrived[st.tv.key] = true; persist(); showTraveler(); } }
+  else if (trav.state==='leave'){ trav.x -= 40*dt; trav.walk += dt*7; if (trav.x < 500) trav.alpha -= dt*1.2; if (trav.alpha<=0) trav.state='none'; }
 }
 
 /* ---------- Monde du moment ---------- */
@@ -620,16 +832,38 @@ function sceneHit(ev){
   const r = cv.getBoundingClientRect(), x = (ev.clientX - r.left - OX)/S, y = (ev.clientY - r.top - OY)/S;
   const info = computeInfo(worldTime());
   if (info.cat){ const [cx,cy] = CAT_POS[info.cat]; if (Math.abs(x-cx) < 26 && Math.abs(y-cy+8) < 22) return 'cat'; }
-  if (info.item && x > 800 && x < 845 && y > 625 && y < 690) return 'item';
-  if (info.waiting && trav.state==='none' && x > 728 && x < 775 && y > 610 && y < 686) return 'traveler';
-  if (x > 990 && x < 1200 && y > 680 && y < 800) return 'garden';
-  if (x > 610 && x < 646 && y > 670 && y < 692) return 'bowl';
-  if (x > 650 && x < 690 && y > 548 && y < 682) return 'lamp';
-  if (x > 250 && x < 1190 && y > 664 && y < 692 && info.debris > .05) return 'platform';
+  if (info.item && x > 800 && x < 856 && y > 625 && y < 690) return 'item';
+  if (info.waiting && trav.state==='none' && x > 736 && x < 790 && y > 600 && y < 686) return 'traveler';
+  if (x > 550 && x < 750 && y > 700 && y < 800) return 'garden';
+  if (x > 652 && x < 684 && y > 670 && y < 694) return 'bowl';
+  if (x > 676 && x < 712 && y > 544 && y < 682) return 'lamp';
+  if (x > 230 && x < 1200 && y > 662 && y < 694 && info.debris > .05) return 'platform';
   return null;
 }
 cv.addEventListener('mousemove', ev => { cv.style.cursor = sceneHit(ev) ? 'pointer' : 'default'; });
+/* gestes au doigt : glisser sur le quai couvert de feuilles balaie ; glisser ailleurs fait pivoter la vue (écrans étroits) ;
+   un appui long sur le jardin l'arrose. Un simple toucher reste un clic. */
+let holdTimer = null;
+cv.addEventListener('pointerdown', ev => {
+  const hit = sceneHit(ev);
+  cam.drag = { x: ev.clientX, y: ev.clientY, pan: cam.pan, hit, moved: false, swept: false, lastX: ev.clientX, lastT: performance.now() };
+  cam.vel = 0; cam.justDragged = false;
+  clearTimeout(holdTimer);
+  if (hit === 'garden') holdTimer = setTimeout(() => { if (cam.drag && !cam.drag.moved){ gWater(); cam.justDragged = true; } }, 450);
+});
+addEventListener('pointermove', ev => {
+  const d = cam.drag; if (!d) return;
+  const dx = ev.clientX - d.x;
+  if (!d.moved && Math.abs(dx) > 10){ d.moved = true; clearTimeout(holdTimer); }
+  if (!d.moved) return;
+  cam.justDragged = true;
+  if (d.hit === 'platform'){ if (!d.swept && Math.abs(dx) > 40){ d.swept = true; gSweep(); } return; }
+  if (W/S < VW){ cam.pan = d.pan - dx/S; layoutCam(); const t = performance.now(); cam.vel = -(ev.clientX - d.lastX)/S / Math.max(1, t - d.lastT) * 16; d.lastX = ev.clientX; d.lastT = t; }
+});
+addEventListener('pointerup', () => { clearTimeout(holdTimer); cam.drag = null; });
+addEventListener('pointercancel', () => { clearTimeout(holdTimer); cam.drag = null; });
 cv.addEventListener('click', ev => {
+  if (cam.justDragged){ cam.justDragged = false; return; }
   const hit = sceneHit(ev); if (!hit) return;
   const info = computeInfo(worldTime());
   if (hit==='cat'){ const [cx,cy] = CAT_POS[info.cat]; purr = {x:cx, y:cy-6, t:0}; son.event('purr'); toast(T.chatRonronne); }
@@ -738,7 +972,7 @@ function hud(w, info){
   $('#ko-kanji').textContent = k[0]; $('#ko-read').textContent = k[1];
   $('#ko-sense').textContent = k[3];
   $('#sekki-line').textContent = `${s[0]} ${s[1]} · ${s[2]}`;
-  const nextK = CIEL.nextKo(jstMs(w.y,w.m,w.d,w.hour), 1)[0];
+  const nextK = CIEL.nextKo(Date.UTC(w.y,w.m-1,w.d,15), 1)[0];
   $('#ko-until').textContent = nextK ? `jusqu'au ${frDate(...Object.values(addDays(nextK.date.y,nextK.date.m,nextK.date.d,-1)))}` : '';
   const kt = N.KO_TEXTE[info.season.ko];
   $('#ko-text').innerHTML = kt ? kt : `<span class="todo">${T.koAEcrire}</span>`;
@@ -772,6 +1006,7 @@ function frame(now){
   const dt = Math.min(.1, (now - lastFrame)/1000); lastFrame = now; clock += dt;
   if (sim.fast && sim.hour != null) sim.hour = (sim.hour + dt*.25) % 24;
   const w = worldTime(); cur = w;
+  if (!cam.drag && Math.abs(cam.vel) > .05){ cam.pan += cam.vel; cam.vel *= .92; layoutCam(); }
   if (sweep){ sweep.t += dt; if (sweep.t >= 1.2){ sweep = null; save.swept = Date.now(); persist(); toast(T.quaiBalaye); } }
   const info = computeInfo(w);
   // le voyageur de passage ne s'affiche pas en double pendant son arrivée
@@ -781,7 +1016,7 @@ function frame(now){
   for (const k in wx) wx[k] += (target[k] - wx[k]) * Math.min(1, dt*.8);
   checkSchedule(w); updateTrain(dt); updateTraveler(dt);
   drawScene(w, info);
-  const tc = train.x + CAR + GAP/2;
+  const tc = train.x + CAR/2;
   son.update({ rain: wx.rain, snow: wx.snow, wind: windNow(), fog: wx.fog, storm: wx.storm, night: info.night, sunE: info.sun.e,
     ko: info.season.ko, temp: real && sim.weather === 'auto' ? real.temp : 12, lampOn: info.lampOn, furin: hasGift(0), ground: groundSnow(),
     bell: crossingActive(), train: train.phase === 'idle' ? null : { dist: Math.abs(tc - 790), speed: (train.v||0) / PX_PER_M, pan: clamp((tc - 790)/900, -1, 1) } });

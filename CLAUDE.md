@@ -16,7 +16,9 @@ Fichiers :
 - `data/textes.js` : **tous** les textes visibles du jeu, provisoires. C'est le seul fichier à toucher pour réécrire un texte.
 - `js/ciel.js` : position réelle du soleil (Meeus), hauteur et direction du soleil à la gare, dates exactes des sekki et kō pour toute année (NAOJ prioritaire).
 - `js/son.js` : tout le son, fabriqué en code avec Web Audio (aucun fichier, aucune licence) : rivière, pluie, vent, neige qui étouffe, lampe, faune selon le kō et la vraie température (grillons, suzumushi, grenouilles, cigales, higurashi, uguisu, chouette, corbeaux), passage à niveau, train (roues, freins, portes, klaxon), furin, gestes. API : `NAGORI.son.update(état)` à chaque image, `NAGORI.son.event(nom)`.
-- `js/jeu.js` : scène canvas 2D, personnages, gestes, registre, carnet, météo, Atelier.
+- `js/jeu.js` : scène canvas 2D, personnages, gestes, registre, carnet, météo, Atelier. Le décor vit dans un repère de 1600 × 900 ; les repères (gare 360-610, distributeur 620-654, lampe 694, banc 740-830, panneau 860-1010, passage à niveau 1262, jardin 560-740 au premier plan) sont notés en tête du bloc « Canvas et cadrage ».
+- `manifest.webmanifest`, `sw.js`, `icones/` : installation sur l'écran d'accueil (PWA) ; le service worker sert le réseau d'abord et le cache hors ligne, jamais la météo. Icônes dessinées en code (PIL), pas générées par IA.
+- `outils/version.py` : numéros de version des fichiers.
 
 Ce que fait le jeu :
 - heure de Tokyo (`Asia/Tokyo`) quelle que soit l'heure de l'appareil ; lumière calculée depuis la vraie hauteur du soleil à la gare ;
@@ -27,6 +29,10 @@ Ce que fait le jeu :
 - voyageur du sekki : arrive le 4e jour du sekki par le train de 16:20, attend jusqu'à ce qu'on l'accueille, laisse un omiyage qui décore la gare ;
 - registre (駅日誌) « depuis ta dernière visite », objets oubliés, carnet (tampons des 72 kō, moments rares dont la première neige, omiyage) ;
 - son : coupé par défaut, bouton « Son » ; s'il a été activé, il revient au premier toucher (règle des navigateurs) ;
+- cadrage selon l'écran : toute la gare en paysage ; en portrait, cadrage sur le bâtiment et le banc, et on glisse pour regarder ailleurs ;
+- décor : gare en bois au toit de tôle rouge, cheminée du poêle qui fume quand il fait moins de 10 °C, tableau à craie, horaires, distributeur lumineux, boîte aux lettres, autorail diesel à une voiture ;
+- la météo marque le décor : neige qui s'accumule (épaisseur réelle), stalactites sous −1 °C, quai mouillé avec flaques et reflets des lumières, gouttes sur les vitres, buée des respirations par grand froid ;
+- gestes au doigt : glisser sur le quai pour balayer, appui long sur le jardin pour arroser, toucher le reste ;
 - passage à niveau à droite du quai : il sonne et clignote 8 s avant l'arrivée de chaque train ;
 - Atelier : outils de test (heure, date, météo, neige au sol, vent, scènes, prochains kō). Visible seulement avec `?atelier` dans l'adresse.
 

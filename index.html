@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="Nagori, une petite gare japonaise qui vit à l'heure, à la météo et à la micro-saison du Japon.">
 <meta name="theme-color" content="#0d1120">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icones/icone-192.png">
+<link rel="apple-touch-icon" href="icones/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Nagori">
 <style>*,*::before,*::after{box-sizing:border-box}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}</style>
 <title>Nagori</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,7 +17,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
 </head>
 <body>
-<link rel="stylesheet" href="css/nagori.css?v=202610181446">
+<link rel="stylesheet" href="css/nagori.css?v=202610181604">
 
 <main class="stage">
   <canvas id="scene" role="img" aria-label="La gare de Nagori, dessinée à l'heure et dans la saison de Tokyo"></canvas>
@@ -131,11 +136,12 @@
   </aside>
 </main>
 
-<script src="data/calendrier.js?v=202610181446"></script>
-<script src="data/monde.js?v=202610181446"></script>
-<script src="data/textes.js?v=202610181446"></script>
-<script src="js/ciel.js?v=202610181446"></script>
-<script src="js/son.js?v=202610181446"></script>
-<script src="js/jeu.js?v=202610181446"></script>
+<script src="data/calendrier.js?v=202610181604"></script>
+<script src="data/monde.js?v=202610181604"></script>
+<script src="data/textes.js?v=202610181604"></script>
+<script src="js/ciel.js?v=202610181604"></script>
+<script src="js/son.js?v=202610181604"></script>
+<script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
+<script src="js/jeu.js?v=202610181604"></script>
 </body>
 </html>
