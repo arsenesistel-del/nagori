@@ -6,26 +6,36 @@ Les documents de référence (bible du projet, boucle de jeu et plan) sont dans 
 
 ## État actuel
 
-Maquette V2, un seul fichier : `index.html` (HTML, CSS et JavaScript, sans dépendance ni étape de build). Hébergée sur GitHub Pages depuis la branche `main`, à la racine.
+Version de travail vers la « version jouable » (voir la feuille de route dans le projet claude.ai). Site statique, sans dépendance ni étape de build, hébergé sur GitHub Pages depuis `main`, à la racine.
 
-Ce qu'elle contient :
-- scène dessinée en canvas 2D : ciel, soleil, lune et sa phase, étoiles, montagnes, rivière, gare, quai, lampe, banc, panneau 名残, jardin ;
-- heure de Tokyo (`Asia/Tokyo`) quelle que soit l'heure de l'appareil ; sekki et kō calculés depuis des dates fixes approximatives ;
-- météo réelle via Open-Meteo (gratuit, sans clé), coordonnées provisoires à Hokkaidō (`STATION`), vérifiée en ligne le 18 octobre 2026 ; si la requête échoue, la scène garde « quelques nuages » mais le bandeau affiche « météo indisponible » ;
-- trains à horaires fixes (`TRAINS`), certains sans arrêt ;
-- habitués à heures réelles : écolier (semaine), vieille dame, cheminot ; chat de gare à heures variables, tirées d'une graine par jour (`dayPlan`) ;
+Fichiers :
+- `index.html` : la page (balisage seulement).
+- `css/nagori.css` : styles.
+- `data/calendrier.js` : 24 sekki, 72 kō (kanji, kana, romaji, sens littéral à vérifier), heures officielles NAOJ des sekki 2026 et 2027, textes des kō (`KO_TEXTE`, vides tant qu'Arsène ne les a pas écrits).
+- `data/monde.js` : gare (`STATION`), trains, voyageur du sekki, omiyage, objets oubliés, moments rares.
+- `data/textes.js` : **tous** les textes visibles du jeu, provisoires. C'est le seul fichier à toucher pour réécrire un texte.
+- `js/ciel.js` : position réelle du soleil (Meeus), hauteur et direction du soleil à la gare, dates exactes des sekki et kō pour toute année (NAOJ prioritaire).
+- `js/jeu.js` : scène canvas 2D, personnages, gestes, registre, carnet, météo, Atelier.
+
+Ce que fait le jeu :
+- heure de Tokyo (`Asia/Tokyo`) quelle que soit l'heure de l'appareil ; lumière calculée depuis la vraie hauteur du soleil à la gare ;
+- kō du jour (kanji, lecture, sens, jusqu'à quand), calculé et non plus approximatif ; un kō commence le jour de son début, toute la journée ;
+- météo réelle via Open-Meteo (gratuit, sans clé) : type et intensité (bruine, pluie, forte pluie, neige, forte neige…), vent, neige au sol ; si la requête échoue, le bandeau affiche « météo indisponible » ;
+- trains à horaires fixes, habitués à heures réelles (écolier en semaine, vieille dame, cheminot), chat à heures tirées d'une graine par jour (`dayPlan`) ;
 - gestes du jour : balayer, arroser, nourrir le chat, allumer la lampe au crépuscule ;
-- voyageur du sekki : arrive le 4e jour du sekki par le train de 16:20, attend sur le banc jusqu'à ce qu'on l'accueille, laisse un omiyage qui décore la gare ;
-- registre (駅日誌) « depuis ta dernière visite », objets oubliés, carnet (tampons des 72 kō, moments rares, omiyage) ;
-- Atelier : outils de test (heure, date, météo, scènes). Caché par défaut ; visible seulement en ajoutant `?atelier` à l'adresse. Les testeurs reçoivent le lien sans ce paramètre.
+- voyageur du sekki : arrive le 4e jour du sekki par le train de 16:20, attend jusqu'à ce qu'on l'accueille, laisse un omiyage qui décore la gare ;
+- registre (駅日誌) « depuis ta dernière visite », objets oubliés, carnet (tampons des 72 kō, moments rares dont la première neige, omiyage) ;
+- Atelier : outils de test (heure, date, météo, neige au sol, vent, scènes, prochains kō). Visible seulement avec `?atelier` dans l'adresse.
 
 Sauvegarde : `localStorage`, clé `nagori-maquette-v2`. Pas de compte, pas de serveur.
 
-Test de six semaines : chaque testeur a un lien `?t=prenom`, mémorisé dans `localStorage` (`nagori-testeur`). Un compteur GoatCounter sans cookie compte les visites sur le chemin `/t/prenom`. Il ne s'active que si la constante `COUNTER` contient le code du compte GoatCounter, et jamais avec `?atelier`. Les testeurs sont prévenus.
+Test de six semaines (repoussé jusqu'à la version jouable) : chaque testeur aura un lien `?t=prenom`, mémorisé dans `localStorage` (`nagori-testeur`). Un compteur GoatCounter sans cookie comptera les visites sur `/t/prenom`. Inactif tant que la constante `COUNTER` est vide, jamais avec `?atelier`.
+
+Tester en local : `python3 -m http.server` dans le dossier, puis ouvrir `http://localhost:8000/?atelier`.
 
 ## Règles du projet
 
-- **Charte** : le code est assisté par IA. Les images et la musique du jeu ne sont jamais générées par IA. Les textes partent des idées, dictées ou souvenirs d'Arsène et c'est lui qui valide. Tous les textes visibles actuels sont des emplacements provisoires.
+- **Charte** : le code est assisté par IA. Les images et la musique du jeu ne sont jamais générées par IA. Les textes partent des idées, dictées ou souvenirs d'Arsène et c'est lui qui valide. Tous les textes visibles actuels sont des emplacements provisoires, rangés dans `data/textes.js`. Ne jamais y mettre de texte narratif inventé par l'IA : seulement des emplacements ou des textes validés par Arsène.
 - **Rétention douce** : aucune loot box, aucun avantage payant, aucune punition d'absence, aucune notification culpabilisante. Une absence ne fait jamais rien perdre.
 - **Ton** : mélancolie douce, dominante Spiritfarer. Textes courts et concrets.
 - Réponses à Arsène : en français, directes, sans tirets cadratins ni tournures qui sonnent IA. Poser une question quand une décision lui revient.

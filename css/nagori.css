@@ -1,0 +1,112 @@
+/* Mise en page : une seule scène plein écran ; les informations posées dessus comme des panneaux de quai ; le registre en papier. */
+:root{
+  --ink:#0d1120;
+  --paper:#f2eee4;
+  --muted:#aeb3c4;
+  --line:rgba(242,238,228,.2);
+  --glass:rgba(13,17,32,.58);
+  --glass-strong:rgba(13,17,32,.9);
+  --stamp:#c9473a;
+  --lamp:#f1c97c;
+  --sheet:#efe8d8;
+  --sheet-ink:#2a2620;
+  --sheet-rule:#d8cdb6;
+  --f-display:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho",Georgia,serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",system-ui,-apple-system,sans-serif;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--ink);color:var(--paper);font-family:var(--f-body);overflow:hidden;-webkit-font-smoothing:antialiased}
+.stage{position:fixed;inset:0}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.hud{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;gap:12px;
+  padding-block:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));pointer-events:none}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.bottom{display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.card{pointer-events:auto;background:var(--glass);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:14px;padding:12px 16px;min-width:0}
+.eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.clock{font-family:var(--f-display);font-size:42px;line-height:1.05;font-variant-numeric:tabular-nums;margin-top:2px}
+.clock small{font-family:var(--f-body);font-size:11px;letter-spacing:.1em;color:var(--lamp);margin-left:8px;vertical-align:middle;text-transform:uppercase}
+.sub{font-size:13px;opacity:.88;margin-top:4px}
+.sub.quiet{color:var(--muted);font-size:12px;opacity:1}
+.sub.call{color:var(--lamp);font-size:12px;opacity:1}
+.season{max-width:300px;text-align:right}
+.sekki{display:flex;align-items:baseline;justify-content:flex-end;gap:10px;margin-top:4px}
+.kanji{font-family:var(--f-display);font-weight:700;font-size:34px;line-height:1}
+.reading{font-size:13px;letter-spacing:.08em;color:var(--muted)}
+.sense{font-size:14px;margin-top:2px}
+.slot{margin-top:10px;border:1px dashed var(--line);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--muted);text-align:left;line-height:1.5}
+.slot b{color:var(--paper);font-weight:500}
+.moment{margin-top:8px;display:inline-flex;align-items:center;gap:6px;font-size:12px;border-radius:999px;padding:4px 10px;background:rgba(241,201,124,.16);color:var(--lamp);border:1px solid rgba(241,201,124,.35)}
+.actions,.gestures{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.gestures{pointer-events:auto}
+.gestures .label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-right:2px}
+button{font:inherit;cursor:pointer;border-radius:999px;min-height:44px;padding:0 18px;border:1px solid var(--line);background:var(--glass);color:var(--paper);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);pointer-events:auto;font-size:14px}
+button.primary{background:var(--paper);color:var(--ink);border-color:var(--paper);font-weight:500}
+button.chip{min-height:38px;padding:0 14px;font-size:13px}
+button.chip.done{border-color:rgba(241,201,124,.5);color:var(--lamp)}
+button.chip.done::before{content:"✓ "}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+button:disabled{opacity:.45;cursor:default}
+.count{font-variant-numeric:tabular-nums;color:var(--muted);margin-left:6px}
+.toast{pointer-events:auto;font-size:13px;padding:8px 14px;border-radius:999px;background:var(--glass-strong);border:1px solid var(--line)}
+.traveler{max-width:360px}
+.traveler h2{font-family:var(--f-display);font-weight:700;font-size:22px;margin:4px 0 0;text-wrap:balance}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.panel{position:absolute;top:max(16px,env(safe-area-inset-top,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));right:max(16px,env(safe-area-inset-right,0px));width:min(390px,calc(100% - 32px));background:var(--glass-strong);border:1px solid var(--line);border-radius:16px;overflow:auto;padding:18px;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.panel header{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px}
+.panel h2{font-family:var(--f-display);font-size:24px;margin:0}
+.panel h3{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:18px 0 8px;font-weight:500}
+.close{min-height:36px;padding:0 14px;font-size:13px}
+/* registre : feuille de papier lignée */
+.registre{background:var(--sheet);color:var(--sheet-ink);border-color:var(--sheet-rule);left:auto}
+.registre h2{color:var(--sheet-ink)}
+.registre .close{background:transparent;color:var(--sheet-ink);border-color:var(--sheet-rule)}
+.registre .jp{font-family:var(--f-display);font-size:13px;color:#8b3a2f;letter-spacing:.2em}
+.registre .since{font-size:13px;color:#6b6457;margin-top:2px}
+.registre h3{color:#8b3a2f;border-bottom:1px solid var(--sheet-rule);padding-bottom:4px}
+.entries{list-style:none;margin:0;padding:0}
+.entries li{display:grid;grid-template-columns:52px 1fr;gap:8px;padding:7px 0;border-bottom:1px solid var(--sheet-rule);font-size:14px;line-height:1.45}
+.entries time{font-variant-numeric:tabular-nums;color:#8b3a2f;font-size:13px;padding-top:1px}
+.entries li.key{font-weight:500}
+.registre .note{color:#6b6457}
+.registre button.primary{background:#8b3a2f;border-color:#8b3a2f;color:var(--sheet)}
+.book-grid{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;align-items:center}
+.book-grid .lbl{font-family:var(--f-display);font-size:15px;white-space:nowrap}
+.book-grid .lbl span{font-family:var(--f-body);font-size:11px;color:var(--muted);margin-left:6px}
+.stamps{display:flex;gap:6px}
+.stamp{width:30px;height:30px;border-radius:50%;border:1px dashed var(--line);display:grid;place-items:center;font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
+.stamp.on{border:2px solid var(--stamp);color:var(--stamp);font-family:var(--f-display);font-weight:700;font-size:13px;background:rgba(201,71,58,.08);transform:rotate(-8deg)}
+.stamp.now{box-shadow:0 0 0 2px var(--lamp)}
+.list{display:grid;gap:6px}
+.mom{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:8px;border:1px dashed var(--line);font-size:13px;color:var(--muted)}
+.mom.on{border-style:solid;color:var(--paper);background:rgba(241,201,124,.08)}
+.mom em{font-style:normal;font-size:11px;letter-spacing:.06em;white-space:nowrap}
+.r-Rare em{color:#9cc3e8}.r-Légendaire em{color:var(--lamp)}
+.lab label{display:block;font-size:13px;margin:12px 0 6px}
+.lab input[type=range]{width:100%}
+.lab select,.lab input[type=date]{width:100%;min-height:40px;border-radius:8px;border:1px solid var(--line);background:#161b2e;color:var(--paper);padding:0 10px;font:inherit}
+.check{display:flex!important;align-items:center;gap:8px}
+.note{font-size:12px;color:var(--muted);line-height:1.55;margin-top:10px}
+.mono{font-variant-numeric:tabular-nums}
+.foot{font-size:11px;color:var(--muted);opacity:.8}
+@media (max-width:560px){
+  .clock{font-size:32px}
+  .season{max-width:none;text-align:left;width:100%}
+  .sekki{justify-content:flex-start}
+  .kanji{font-size:28px}
+  .panel{left:max(16px,env(safe-area-inset-left,0px));width:auto;top:auto;max-height:80%}
+  button{padding:0 14px}
+  .foot{display:none}
+  .gestures .label{display:none}
+  .slot{display:none}
+}
+/* carte de saison : le kō du jour en grand, le sekki en dessous */
+.season .reading{margin-top:4px;text-align:right;font-family:var(--f-display);letter-spacing:.06em}
+.season .sense{margin-top:6px}
+.sekki-line{margin-top:8px;font-size:12px;color:var(--muted)}
+.ko-text{margin-top:10px;font-size:13px;line-height:1.55;text-align:left}
+.ko-text .todo{display:block;border:1px dashed var(--line);border-radius:8px;padding:8px 10px;color:var(--muted);font-size:12px}
+@media (max-width:560px){ .season .reading{text-align:left} .ko-text{display:none} }
