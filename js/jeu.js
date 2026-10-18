@@ -425,7 +425,8 @@ function hasGift(i){ return save.preview || Object.values(save.gifts).includes(i
 /* le bâtiment : salle d'attente en bois, toit de tôle rouge comme à Hokkaidō, poêle l'hiver */
 function drawStation(L, night, snowy, info, temp, wind){
   const x0 = 360, x1 = 610, base = 680, top = 584, k = .2+.8*L, lit = night > .3;
-  const stove = temp < 10, hour = cur.hour, open = hour >= 5.5 && hour < 23;
+  /* la salle d'attente reste éclairée toute la nuit ; le poêle ne chauffe qu'aux heures des trains */
+  const hour = cur.hour, open = true, stove = temp < 10 && hour >= 5.5 && hour < 22.5;
   // murs : planches en bas, enduit et colombages en haut
   ctx.fillStyle = col(C.plaster, k); ctx.fillRect(x0, top, x1-x0, base-top);
   ctx.fillStyle = col(C.wood, k); ctx.fillRect(x0, top+58, x1-x0, base-top-58);
@@ -461,7 +462,7 @@ function drawStation(L, night, snowy, info, temp, wind){
   ctx.fillStyle = col(mix(rc,[0,0,0],.4), k); ctx.fillRect(x0-34, top+6, x1-x0+68, 4);
   const chX = x1-48;
   ctx.fillStyle = col([70,70,74], k); ctx.fillRect(chX, top-78, 7, 40); ctx.fillRect(chX-3, top-82, 13, 5);
-  if (stove && open && Math.random() < .12) puff(chX+3, top-84, 'smoke');
+  if (stove && Math.random() < .12) puff(chX+3, top-84, 'smoke');
   if (snowy){
     const t = 3 + snowCover*9;
     ctx.fillStyle = col(C.snow, .42+.58*L);
