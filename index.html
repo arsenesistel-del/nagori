@@ -274,6 +274,23 @@ let save = fresh();
 try { const raw = localStorage.getItem(KEY); if (raw) save = Object.assign(fresh(), JSON.parse(raw)); } catch (e) {}
 const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} };
 
+/* ---------- Test de six semaines : compteur de visites ----------
+   Chaque testeur reçoit un lien personnel (?t=prenom), mémorisé dans son navigateur.
+   GoatCounter (gratuit, sans cookie) note une visite sur le chemin /t/prenom.
+   Rien n'est compté tant que COUNTER est vide, ni avec ?atelier (visites d'Arsène). */
+const COUNTER = '';
+(() => {
+  const q = new URLSearchParams(location.search);
+  if (q.has('atelier')) return;
+  let who = (q.get('t') || '').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 24);
+  try { if (who) localStorage.setItem('nagori-testeur', who); else who = localStorage.getItem('nagori-testeur') || ''; } catch (e) {}
+  if (!COUNTER) return;
+  window.goatcounter = { path: who ? `/t/${who}` : '/sans-lien' };
+  const s = document.createElement('script');
+  s.async = true; s.src = 'https://gc.zgo.at/count.js'; s.dataset.goatcounter = `https://${COUNTER}.goatcounter.com/count`;
+  document.head.appendChild(s);
+})();
+
 /* ---------- Temps ---------- */
 const fmt = new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
 function tokyoAt(ms){ const p = Object.fromEntries(fmt.formatToParts(new Date(ms)).map(x=>[x.type,x.value])); return {y:+p.year,m:+p.month,d:+p.day,h:+p.hour + (+p.minute)/60 + (+p.second)/3600}; }

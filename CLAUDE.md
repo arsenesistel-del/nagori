@@ -21,6 +21,8 @@ Ce qu'elle contient :
 
 Sauvegarde : `localStorage`, clé `nagori-maquette-v2`. Pas de compte, pas de serveur.
 
+Test de six semaines : chaque testeur a un lien `?t=prenom`, mémorisé dans `localStorage` (`nagori-testeur`). Un compteur GoatCounter sans cookie compte les visites sur le chemin `/t/prenom`. Il ne s'active que si la constante `COUNTER` contient le code du compte GoatCounter, et jamais avec `?atelier`. Les testeurs sont prévenus.
+
 ## Règles du projet
 
 - **Charte** : le code est assisté par IA. Les images et la musique du jeu ne sont jamais générées par IA. Les textes partent des idées, dictées ou souvenirs d'Arsène et c'est lui qui valide. Tous les textes visibles actuels sont des emplacements provisoires.
