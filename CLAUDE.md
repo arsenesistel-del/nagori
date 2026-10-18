@@ -34,6 +34,8 @@ Sauvegarde : `localStorage`, clé `nagori-maquette-v2`. Pas de compte, pas de se
 
 Test de six semaines (repoussé jusqu'à la version jouable) : chaque testeur aura un lien `?t=prenom`, mémorisé dans `localStorage` (`nagori-testeur`). Un compteur GoatCounter sans cookie comptera les visites sur `/t/prenom`. Inactif tant que la constante `COUNTER` est vide, jamais avec `?atelier`.
 
+Avant chaque mise en ligne : `python3 outils/version.py` (numéro de version sur les fichiers chargés, sinon les navigateurs mélangent ancienne et nouvelle version).
+
 Tester en local : `python3 -m http.server` dans le dossier, puis ouvrir `http://localhost:8000/?atelier`.
 
 Direction : 2D en couches (choix du 18 octobre 2026), pour pouvoir accueillir plus tard une illustration d'artiste découpée en calques et éclairée par le code. Ressources gratuites uniquement pour l'instant.
