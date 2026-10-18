@@ -15,6 +15,7 @@ Fichiers :
 - `data/monde.js` : gare (`STATION`), trains, voyageur du sekki, omiyage, objets oubliés, moments rares.
 - `data/textes.js` : **tous** les textes visibles du jeu, provisoires. C'est le seul fichier à toucher pour réécrire un texte.
 - `js/ciel.js` : position réelle du soleil (Meeus), hauteur et direction du soleil à la gare, dates exactes des sekki et kō pour toute année (NAOJ prioritaire).
+- `js/son.js` : tout le son, fabriqué en code avec Web Audio (aucun fichier, aucune licence) : rivière, pluie, vent, neige qui étouffe, lampe, faune selon le kō et la vraie température (grillons, suzumushi, grenouilles, cigales, higurashi, uguisu, chouette, corbeaux), passage à niveau, train (roues, freins, portes, klaxon), furin, gestes. API : `NAGORI.son.update(état)` à chaque image, `NAGORI.son.event(nom)`.
 - `js/jeu.js` : scène canvas 2D, personnages, gestes, registre, carnet, météo, Atelier.
 
 Ce que fait le jeu :
@@ -25,6 +26,8 @@ Ce que fait le jeu :
 - gestes du jour : balayer, arroser, nourrir le chat, allumer la lampe au crépuscule ;
 - voyageur du sekki : arrive le 4e jour du sekki par le train de 16:20, attend jusqu'à ce qu'on l'accueille, laisse un omiyage qui décore la gare ;
 - registre (駅日誌) « depuis ta dernière visite », objets oubliés, carnet (tampons des 72 kō, moments rares dont la première neige, omiyage) ;
+- son : coupé par défaut, bouton « Son » ; s'il a été activé, il revient au premier toucher (règle des navigateurs) ;
+- passage à niveau à droite du quai : il sonne et clignote 8 s avant l'arrivée de chaque train ;
 - Atelier : outils de test (heure, date, météo, neige au sol, vent, scènes, prochains kō). Visible seulement avec `?atelier` dans l'adresse.
 
 Sauvegarde : `localStorage`, clé `nagori-maquette-v2`. Pas de compte, pas de serveur.
@@ -32,6 +35,8 @@ Sauvegarde : `localStorage`, clé `nagori-maquette-v2`. Pas de compte, pas de se
 Test de six semaines (repoussé jusqu'à la version jouable) : chaque testeur aura un lien `?t=prenom`, mémorisé dans `localStorage` (`nagori-testeur`). Un compteur GoatCounter sans cookie comptera les visites sur `/t/prenom`. Inactif tant que la constante `COUNTER` est vide, jamais avec `?atelier`.
 
 Tester en local : `python3 -m http.server` dans le dossier, puis ouvrir `http://localhost:8000/?atelier`.
+
+Direction : 2D en couches (choix du 18 octobre 2026), pour pouvoir accueillir plus tard une illustration d'artiste découpée en calques et éclairée par le code. Ressources gratuites uniquement pour l'instant.
 
 ## Règles du projet
 

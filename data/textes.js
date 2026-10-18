@@ -22,6 +22,9 @@ NAGORI.TEXTES = {
   voyageurAnnonce: 'Voyageur annoncé le {date}, {heure}',
   voyageurProchain: 'Prochain voyageur le {date}, {heure}',
 
+  sonActif: 'Son',
+  sonCoupe: 'Son coupé',
+
   /* tampons et carnet */
   nouveauTampon: 'Nouveau tampon : {ko}',
   momentAjoute: 'Moment ajouté au carnet : {moment}.',

@@ -4,6 +4,7 @@ const $ = s => document.querySelector(s);
 
 /* ---------- Données (fichiers data/) ---------- */
 const N = window.NAGORI, T = N.TEXTES, CIEL = N.ciel;
+const son = N.son || { event(){}, update(){}, enable(){ return false; }, disable(){}, on:false, supported:false };
 const STATION = N.STATION, TRAINS = N.TRAINS;
 const SEKKI = N.SEKKI, KO = N.KO;
 const GIFTS = N.OMIYAGE.map(o => o.nom), ITEMS = N.OBJETS.map(o => o.nom);
@@ -171,15 +172,26 @@ let water = null, sweep = null, purr = null, lastTrainKey = null, panelStep = 0,
 function kindNow(){ if (sim.weather !== 'auto') return sim.weather; return real ? real.kind : 'partly'; }
 
 /* ---------- Trains ---------- */
-function startTrain(opts){ if (train.phase !== 'idle') return false; Object.assign(train, {phase: opts.stop ? 'in' : 'pass', t:0, x:1750, stop:opts.stop, traveler:!!opts.traveler}); return true; }
+/* la sonnerie du passage à niveau commence avant que le train n'apparaisse (t négatif) */
+const BELL_LEAD = 8, CROSSING_X = 1340, PX_PER_M = 12.9;
+function startTrain(opts){ if (train.phase !== 'idle') return false; Object.assign(train, {phase: opts.stop ? 'in' : 'pass', t:-BELL_LEAD, x:1750, prevX:1750, v:0, stop:opts.stop, traveler:!!opts.traveler, said:{}}); return true; }
 const easeOut = t => 1-Math.pow(1-t,3), easeIn = t => t*t*t;
 function updateTrain(dt){
   if (train.phase==='idle') return;
   train.t += dt;
-  if (train.phase==='pass'){ train.x = 1750 - train.t*300; if (train.x < -800) train.phase='idle'; }
-  else if (train.phase==='in'){ const k=Math.min(1,train.t/7); train.x = 1750 + (STOP_X-1750)*easeOut(k); if (k>=1){ train.phase='stop'; train.t=0; } }
-  else if (train.phase==='stop'){ if (train.traveler && train.t>2.2 && trav.state==='none'){ trav.state='walk'; trav.x=STOP_X+CAR+GAP+70; trav.alpha=1; train.traveler=false; } if (train.t>9){ train.phase='out'; train.t=0; } }
-  else if (train.phase==='out'){ const k=Math.min(1,train.t/7); train.x = STOP_X + (-700-STOP_X)*easeIn(k); if (k>=1) train.phase='idle'; }
+  const T0 = Math.max(0, train.t), once = k => { if (train.said[k]) return false; train.said[k] = true; return true; };
+  const pan = clamp((train.x + CAR - 790) / 900, -1, 1);
+  if (train.phase==='pass'){ train.x = 1750 - T0*300; if (train.t > -1.2 && once('horn')) son.event('horn', {pan: .8}); if (train.x < -800) train.phase='idle'; }
+  else if (train.phase==='in'){ const k=Math.min(1,T0/7); train.x = 1750 + (STOP_X-1750)*easeOut(k); if (k > .55 && once('brake')) son.event('brake', {pan}); if (k>=1){ train.phase='stop'; train.t=0; son.event('hiss', {pan}); son.event('doors', {pan, delay: .9}); } }
+  else if (train.phase==='stop'){ if (train.traveler && train.t>2.2 && trav.state==='none'){ trav.state='walk'; trav.x=STOP_X+CAR+GAP+70; trav.alpha=1; train.traveler=false; } if (train.t > 7.6 && once('close')) son.event('doors', {pan}); if (train.t>9){ train.phase='out'; train.t=0; train.said = {}; } }
+  else if (train.phase==='out'){ const k=Math.min(1,T0/7); train.x = STOP_X + (-700-STOP_X)*easeIn(k); if (k>=1) train.phase='idle'; }
+  train.v = dt > 0 ? Math.abs(train.x - train.prevX) / dt : 0; train.prevX = train.x;
+}
+/* la sonnerie sonne tant que le train n'a pas franchi le passage à niveau (à droite du quai) */
+function crossingActive(){
+  if (train.phase==='in') return train.x + 2*CAR > CROSSING_X - 40;
+  if (train.phase==='pass') return train.x + 2*CAR + GAP > CROSSING_X - 40;
+  return false;
 }
 function travelerState(w){
   const s = seasonOf(w.y,w.m,w.d), tv = travelerOf(s);
@@ -275,6 +287,7 @@ function drawScene(w, info){
   ctx.fillStyle = rgb(shade(C.rail, .3+.7*L)); ctx.fillRect(-200,651,2000,3); ctx.fillRect(-200,661,2000,3);
   for (const p of info.people) if (p.kind==='worker') figure(p, 652, L, night);
   drawTrain(L, night);
+  drawCrossing(L, night, crossingActive());
   // quai
   ctx.fillStyle = rgb(shade(mix(C.gravel,[0,0,0],.2), .2+.8*L)); ctx.fillRect(-200,668,2000,50);
   ctx.fillStyle = rgb(shade(C.plat, .22+.78*L)); ctx.fillRect(250,668,940,22);
@@ -317,7 +330,7 @@ function drawScene(w, info){
     ctx.fillStyle = 'rgba(246,248,252,.85)';
     for (let i=0;i<n;i++){ const s = SNOW[i]; s.y += s.v*.004; if (s.y>1.02){ s.y=-.02; s.x=Math.random(); } s.x -= wind*.0012; if (s.x < -.02) s.x = 1.02; ctx.beginPath(); ctx.arc((s.x + Math.sin(clock*.6+s.ph)*.01)*W, s.y*H, s.r, 0, 7); ctx.fill(); }
   }
-  if (wx.storm > .5 && !reduceMotion && Math.random() < .004) flash = .5;
+  if (wx.storm > .5 && Math.random() < .004){ if (!reduceMotion) flash = .5; son.event('thunder', {delay: .8 + Math.random()*2.5}); }
   if (flash > 0){ ctx.fillStyle = `rgba(230,236,255,${flash})`; ctx.fillRect(0,0,W,H); flash -= .03; }
   const vg = ctx.createRadialGradient(W/2,H*.55,Math.min(W,H)*.35,W/2,H*.55,Math.max(W,H)*.8);
   vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,`rgba(4,6,14,${.28+.25*night})`);
@@ -338,6 +351,21 @@ function drawTrain(L, night){
       ctx.fillStyle = night>.3 ? 'rgba(255,240,200,.95)' : rgb(shade([230,220,190],L)); ctx.fillRect(x+4, y+78, 8, 6);
       if (night>.3 && train.phase!=='stop'){ const hg = ctx.createRadialGradient(x,y+80,0,x,y+80,220); hg.addColorStop(0,`rgba(255,236,190,${.35*night})`); hg.addColorStop(1,'rgba(255,236,190,0)'); ctx.fillStyle = hg; ctx.fillRect(x-220,y-140,240,300); }
     }
+  }
+}
+function drawCrossing(L, night, active){
+  const x = CROSSING_X, base = 668, k = .25+.75*L;
+  for (let i=0;i<8;i++){ ctx.fillStyle = rgb(shade(i%2 ? [30,30,32] : [226,190,40], k)); ctx.fillRect(x-3, base-112+i*14, 6, 14); }
+  ctx.save(); ctx.translate(x, base-126);
+  for (const a of [.62, -.62]){ ctx.save(); ctx.rotate(a); ctx.fillStyle = rgb(shade([30,30,32],k)); ctx.fillRect(-23,-4.5,46,9); ctx.fillStyle = rgb(shade([232,196,44],k)); ctx.fillRect(-21,-3,42,6); ctx.restore(); }
+  ctx.restore();
+  ctx.fillStyle = rgb(shade([40,40,44],k)); ctx.fillRect(x-20, base-104, 40, 4);
+  const blink = Math.floor(clock*2.38) % 2;
+  for (const [i, dx] of [[0,-13],[1,13]]){
+    const lit = active && blink === i;
+    ctx.fillStyle = rgb(shade([30,30,32],k)); ctx.beginPath(); ctx.arc(x+dx, base-94, 8, 0, 7); ctx.fill();
+    ctx.fillStyle = lit ? 'rgba(255,70,50,.98)' : rgb(shade([90,30,28],k)); ctx.beginPath(); ctx.arc(x+dx, base-94, 5.5, 0, 7); ctx.fill();
+    if (lit){ const g = ctx.createRadialGradient(x+dx,base-94,0,x+dx,base-94,40+50*night); g.addColorStop(0,`rgba(255,60,40,${.35+.4*night})`); g.addColorStop(1,'rgba(255,60,40,0)'); ctx.fillStyle = g; ctx.fillRect(x+dx-90,base-184,180,180); }
   }
 }
 function hasGift(i){ return save.preview || Object.values(save.gifts).includes(i); }
@@ -529,7 +557,7 @@ function renderRegistre(fromMs){
   if (!total) html += `<div class="note">${T.registreVide}</div>`;
   $('#reg-body').innerHTML = html;
 }
-function openRegistre(fromMs){ renderRegistre(fromMs); $('#reg').hidden = false; $('#book').hidden = true; $('#lab').hidden = true; }
+function openRegistre(fromMs){ renderRegistre(fromMs); son.event('page'); $('#reg').hidden = false; $('#book').hidden = true; $('#lab').hidden = true; }
 
 /* ---------- Interface ---------- */
 const toastEl = $('#toast'); let toastTimer = null;
@@ -572,7 +600,7 @@ $('#tr-next').addEventListener('click', () => {
   else if (panelStep === 2){
     const st = travelerState(worldTime()); const gift = st.s.i % GIFTS.length;
     save.gifts[st.tv.key] = gift; persist(); trav.state = 'leave'; trav.x = 750; trav.alpha = 1; trav.walk = 0;
-    $('#tr-slot').innerHTML = tx(T.voyageurDepart, {cadeau: GIFTS[gift]});
+    $('#tr-slot').innerHTML = tx(T.voyageurDepart, {cadeau: GIFTS[gift]}); son.event('gift');
     $('#tr-next').textContent = T.btnFermer;
   }
   else $('#traveler').hidden = true;
@@ -581,10 +609,10 @@ $('#tr-later').addEventListener('click', () => { $('#traveler').hidden = true; }
 
 /* gestes */
 function today(){ const w = worldTime(); return dayKey(w.y,w.m,w.d); }
-function gWater(){ const w = worldTime(); water = {t:0}; if (save.watered === today() && !w.simulated){ toast(T.jardinDejaArrose); return; } save.watered = today(); save.growth = Math.min(14, save.growth+1); persist(); toast(save.growth >= 14 ? T.jardinPlein : T.jardinArrose); }
-function gSweep(){ if (sweep) return; const info = computeInfo(worldTime()); if (info.debris < .05){ toast(T.quaiPropre); return; } sweep = {t:0}; }
-function gFeed(){ const w = worldTime(); if (save.fed === today()){ toast(T.gamelleDejaPleine); return; } save.fed = today(); save.fedHour = w.hour; persist(); toast(T.gamelleRemplie); }
-function gLamp(){ const w = worldTime(), info = computeInfo(w); if (info.sun.e >= .08){ toast(T.lampeTropTot); return; } if (save.lamp === nightKey(w)){ toast(T.lampeDejaAllumee); return; } save.lamp = nightKey(w); persist(); toast(T.lampeAllumee); }
+function gWater(){ const w = worldTime(); water = {t:0}; son.event('water'); if (save.watered === today() && !w.simulated){ toast(T.jardinDejaArrose); return; } save.watered = today(); save.growth = Math.min(14, save.growth+1); persist(); toast(save.growth >= 14 ? T.jardinPlein : T.jardinArrose); }
+function gSweep(){ if (sweep) return; const info = computeInfo(worldTime()); if (info.debris < .05){ toast(T.quaiPropre); return; } sweep = {t:0}; son.event('sweep'); }
+function gFeed(){ const w = worldTime(); if (save.fed === today()){ toast(T.gamelleDejaPleine); return; } save.fed = today(); save.fedHour = w.hour; persist(); son.event('feed'); toast(T.gamelleRemplie); }
+function gLamp(){ const w = worldTime(), info = computeInfo(w); if (info.sun.e >= .08){ toast(T.lampeTropTot); return; } if (save.lamp === nightKey(w)){ toast(T.lampeDejaAllumee); return; } save.lamp = nightKey(w); persist(); son.event('lamp'); toast(T.lampeAllumee); }
 $('#g-water').addEventListener('click', gWater); $('#g-sweep').addEventListener('click', gSweep); $('#g-feed').addEventListener('click', gFeed); $('#g-lamp').addEventListener('click', gLamp);
 
 /* clics dans la scène */
@@ -604,7 +632,7 @@ cv.addEventListener('mousemove', ev => { cv.style.cursor = sceneHit(ev) ? 'point
 cv.addEventListener('click', ev => {
   const hit = sceneHit(ev); if (!hit) return;
   const info = computeInfo(worldTime());
-  if (hit==='cat'){ const [cx,cy] = CAT_POS[info.cat]; purr = {x:cx, y:cy-6, t:0}; toast(T.chatRonronne); }
+  if (hit==='cat'){ const [cx,cy] = CAT_POS[info.cat]; purr = {x:cx, y:cy-6, t:0}; son.event('purr'); toast(T.chatRonronne); }
   else if (hit==='item'){ save.found.push({key:info.item.key, idx:info.item.idx}); persist(); toast(tx(T.objetRange, {objet: ITEMS[info.item.idx]})); }
   else if (hit==='traveler') showTraveler();
   else if (hit==='garden') gWater();
@@ -615,13 +643,20 @@ cv.addEventListener('click', ev => {
 
 /* panneaux */
 const book = $('#book'), lab = $('#lab'), reg = $('#reg');
+/* son : coupé par défaut ; si le joueur l'a activé, il revient au premier toucher (règle des navigateurs) */
+const btnSon = $('#btn-son');
+function renderSon(){ btnSon.textContent = son.on ? T.sonActif : T.sonCoupe; btnSon.setAttribute('aria-pressed', son.on ? 'true' : 'false'); btnSon.classList.toggle('done', son.on); }
+if (!son.supported) btnSon.hidden = true;
+btnSon.addEventListener('click', async () => { if (son.on){ son.disable(); save.sound = false; } else { save.sound = !!(await son.enable()); } persist(); renderSon(); });
+if (save.sound){ const wake = async () => { if (!son.on) await son.enable(); renderSon(); }; addEventListener('pointerdown', wake, { once: true }); addEventListener('keydown', wake, { once: true }); }
+renderSon();
 $('#btn-book').addEventListener('click', () => { book.hidden = !book.hidden; lab.hidden = true; reg.hidden = true; });
 /* l'Atelier n'apparaît qu'avec ?atelier dans l'adresse ; les testeurs ne le voient pas */
 const ATELIER = new URLSearchParams(location.search).has('atelier');
 $('#btn-lab').hidden = !ATELIER;
 $('#btn-lab').addEventListener('click', () => { lab.hidden = !lab.hidden; book.hidden = true; reg.hidden = true; });
 $('#btn-reg').addEventListener('click', () => { if (reg.hidden) openRegistre(save.prevVisit || save.lastVisit); else reg.hidden = true; });
-$('#reg-stamp').addEventListener('click', () => { reg.hidden = true; toast(T.registreTamponne); });
+$('#reg-stamp').addEventListener('click', () => { reg.hidden = true; son.event('stamp'); toast(T.registreTamponne); });
 document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => { document.getElementById(b.dataset.close).hidden = true; }));
 addEventListener('keydown', ev => { if (ev.key === 'Escape'){ book.hidden = true; lab.hidden = true; reg.hidden = true; } });
 
@@ -708,7 +743,7 @@ function hud(w, info){
   const kt = N.KO_TEXTE[info.season.ko];
   $('#ko-text').innerHTML = kt ? kt : `<span class="todo">${T.koAEcrire}</span>`;
   $('#lab-hour-val').textContent = hhmm(sim.hour != null ? sim.hour : w.hour);
-  if (!save.stamps.includes(info.season.ko)){ save.stamps.push(info.season.ko); persist(); toast(tx(T.nouveauTampon, {ko: koName(info.season.ko)})); }
+  if (!save.stamps.includes(info.season.ko)){ save.stamps.push(info.season.ko); persist(); son.event('tampon'); toast(tx(T.nouveauTampon, {ko: koName(info.season.ko)})); }
   const best = info.active.map(id=>MOMENTS.find(m=>m.id===id)).sort((a,b)=>RANK[b.rar]-RANK[a.rar])[0];
   const mEl = $('#moment'); if (best){ mEl.hidden = false; mEl.textContent = `${best.rar} · ${best.name}`; } else mEl.hidden = true;
   for (const id of info.active) if (!save.moments.includes(id)){
@@ -746,6 +781,10 @@ function frame(now){
   for (const k in wx) wx[k] += (target[k] - wx[k]) * Math.min(1, dt*.8);
   checkSchedule(w); updateTrain(dt); updateTraveler(dt);
   drawScene(w, info);
+  const tc = train.x + CAR + GAP/2;
+  son.update({ rain: wx.rain, snow: wx.snow, wind: windNow(), fog: wx.fog, storm: wx.storm, night: info.night, sunE: info.sun.e,
+    ko: info.season.ko, temp: real && sim.weather === 'auto' ? real.temp : 12, lampOn: info.lampOn, furin: hasGift(0), ground: groundSnow(),
+    bell: crossingActive(), train: train.phase === 'idle' ? null : { dist: Math.abs(tc - 790), speed: (train.v||0) / PX_PER_M, pan: clamp((tc - 790)/900, -1, 1) } });
   if (now - lastHud > 400){ lastHud = now; hud(w, info); }
   requestAnimationFrame(frame);
 }
