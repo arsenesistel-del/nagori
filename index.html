@@ -162,7 +162,7 @@ button:disabled{opacity:.45;cursor:default}
       <nav class="actions" aria-label="Menus">
         <button id="btn-reg">Registre</button>
         <button id="btn-book">Carnet<span class="count" id="book-count">0/72</span></button>
-        <button id="btn-lab">Atelier</button>
+        <button id="btn-lab" hidden>Atelier</button>
       </nav>
       <div class="foot">Maquette Nagori V2 · gare et région provisoires · textes et illustrations à venir</div>
     </div>
@@ -845,6 +845,9 @@ cv.addEventListener('click', ev => {
 /* panneaux */
 const book = $('#book'), lab = $('#lab'), reg = $('#reg');
 $('#btn-book').addEventListener('click', () => { book.hidden = !book.hidden; lab.hidden = true; reg.hidden = true; });
+/* l'Atelier n'apparaît qu'avec ?atelier dans l'adresse ; les testeurs ne le voient pas */
+const ATELIER = new URLSearchParams(location.search).has('atelier');
+$('#btn-lab').hidden = !ATELIER;
 $('#btn-lab').addEventListener('click', () => { lab.hidden = !lab.hidden; book.hidden = true; reg.hidden = true; });
 $('#btn-reg').addEventListener('click', () => { if (reg.hidden) openRegistre(save.prevVisit || save.lastVisit); else reg.hidden = true; });
 $('#reg-stamp').addEventListener('click', () => { reg.hidden = true; toast('Registre tamponné.'); });
@@ -873,6 +876,7 @@ $('#lab-place').textContent = `Gare placée provisoirement à ${STATION.lat}° N
 
 /* ---------- Météo réelle ---------- */
 function wmo(code, cover){ if (code>=95) return 'storm'; if ((code>=71&&code<=77)||code===85||code===86) return 'snow'; if ((code>=51&&code<=67)||(code>=80&&code<=82)) return 'rain'; if (code===45||code===48) return 'fog'; if (code===3 || cover>75) return 'overcast'; if (code===2 || cover>30) return 'partly'; return 'clear'; }
+let wxFailed = false;
 async function fetchWeather(){
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${STATION.lat}&longitude=${STATION.lon}&current=temperature_2m,weather_code,cloud_cover&timezone=Asia%2FTokyo`;
   try {
@@ -880,11 +884,11 @@ async function fetchWeather(){
     const r = await fetch(url, { signal: ctl.signal }); clearTimeout(to);
     if (!r.ok) throw new Error('http');
     const j = await r.json();
-    real = { kind: wmo(j.current.weather_code, j.current.cloud_cover), temp: Math.round(j.current.temperature_2m) };
+    real = { kind: wmo(j.current.weather_code, j.current.cloud_cover), temp: Math.round(j.current.temperature_2m) }; wxFailed = false;
     $('#wx-status').textContent = `Météo réelle reçue : ${WX_LABEL[real.kind]}, ${real.temp} °C.`;
   } catch (e) {
-    real = null;
-    $('#wx-status').textContent = "Météo réelle bloquée dans cet aperçu : la maquette simule « quelques nuages ». Sur le vrai site, la même requête (Open-Meteo, gratuite) donnera la météo du moment.";
+    real = null; wxFailed = true;
+    $('#wx-status').textContent = "Météo réelle indisponible : la scène affiche « quelques nuages » par défaut, et le bandeau l'indique.";
   }
 }
 fetchWeather(); setInterval(fetchWeather, 15*60e3);
@@ -895,7 +899,8 @@ function hud(w, info){
   const s = SEKKI[info.season.i], kind = kindNow();
   $('#date-label').textContent = frDate(w.y,w.m,w.d);
   $('#clock').innerHTML = hhmm(w.hour) + (w.simulated ? '<small>simulé</small>' : '');
-  $('#sub').textContent = `${phaseLabel(info.sun.e, w.hour, info.sun.noon)} · ${WX_LABEL[kind]}` + (real && sim.weather==='auto' ? ` · ${real.temp} °C` : '');
+  const wxText = sim.weather !== 'auto' ? `${WX_LABEL[kind]} (simulé)` : real ? `${WX_LABEL[kind]} · ${real.temp} °C` : wxFailed ? 'météo indisponible' : 'météo en route…';
+  $('#sub').textContent = `${phaseLabel(info.sun.e, w.hour, info.sun.noon)} · ${wxText}`;
   $('#next-train').textContent = train.phase==='idle' ? `Prochain arrêt ${nextStop(w.hour)}` : train.phase==='pass' ? 'Un train passe sans s\'arrêter' : train.phase==='stop' ? 'Un train est en gare' : 'Un train approche';
   const st = info.tstate; let tl = '';
   if (st.waiting) tl = 'Un voyageur t\'attend sur le banc';

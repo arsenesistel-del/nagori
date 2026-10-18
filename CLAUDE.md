@@ -11,13 +11,13 @@ Maquette V2, un seul fichier : `index.html` (HTML, CSS et JavaScript, sans dépe
 Ce qu'elle contient :
 - scène dessinée en canvas 2D : ciel, soleil, lune et sa phase, étoiles, montagnes, rivière, gare, quai, lampe, banc, panneau 名残, jardin ;
 - heure de Tokyo (`Asia/Tokyo`) quelle que soit l'heure de l'appareil ; sekki et kō calculés depuis des dates fixes approximatives ;
-- météo réelle via Open-Meteo (gratuit, sans clé), coordonnées provisoires à Hokkaidō (`STATION`) ; repli sur « quelques nuages » si la requête échoue ;
+- météo réelle via Open-Meteo (gratuit, sans clé), coordonnées provisoires à Hokkaidō (`STATION`), vérifiée en ligne le 18 octobre 2026 ; si la requête échoue, la scène garde « quelques nuages » mais le bandeau affiche « météo indisponible » ;
 - trains à horaires fixes (`TRAINS`), certains sans arrêt ;
 - habitués à heures réelles : écolier (semaine), vieille dame, cheminot ; chat de gare à heures variables, tirées d'une graine par jour (`dayPlan`) ;
 - gestes du jour : balayer, arroser, nourrir le chat, allumer la lampe au crépuscule ;
 - voyageur du sekki : arrive le 4e jour du sekki par le train de 16:20, attend sur le banc jusqu'à ce qu'on l'accueille, laisse un omiyage qui décore la gare ;
 - registre (駅日誌) « depuis ta dernière visite », objets oubliés, carnet (tampons des 72 kō, moments rares, omiyage) ;
-- Atelier : outils de test (heure, date, météo, scènes), à retirer de la version jouable.
+- Atelier : outils de test (heure, date, météo, scènes). Caché par défaut ; visible seulement en ajoutant `?atelier` à l'adresse. Les testeurs reçoivent le lien sans ce paramètre.
 
 Sauvegarde : `localStorage`, clé `nagori-maquette-v2`. Pas de compte, pas de serveur.
 
