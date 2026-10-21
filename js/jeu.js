@@ -11,6 +11,7 @@ const GIFTS = N.OMIYAGE.map(o => o.nom), ITEMS = N.OBJETS.map(o => o.nom);
 const MOMENTS = N.MOMENTS.map(m => ({ id: m.id, name: m.nom, rar: m.rar }));
 const RANK = {'Peu commun':1,'Rare':2,'Légendaire':3};
 const WX_LABEL = T.meteo;
+const MET = N.meteo;                 /* js/meteo.js : sources de la météo, panne, point de vue */
 /* remplace {mot} par sa valeur */
 const tx = (str, vars = {}) => String(str).replace(/\{(\w+)\}/g, (_, k) => vars[k] != null ? vars[k] : '');
 const koName = k => `${KO[k][0]} (${KO[k][2]})`;
@@ -25,7 +26,9 @@ const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* ---------- Sauvegarde locale ---------- */
 const KEY = 'nagori-maquette-v2';
-const fresh = () => ({ growth:0, watered:null, swept:null, fed:null, fedHour:0, lamp:null, stamps:[], moments:[], gifts:{}, arrived:{}, found:[], lastVisit:null, preview:false });
+/* version : 3 depuis le prototype de 14 jours. Les champs ajoutés viennent ici, avec leur valeur par défaut :
+   l'ancienne sauvegarde est fusionnée par-dessus au chargement, sans migration. */
+const fresh = () => ({ version:3, growth:0, watered:null, swept:null, fed:null, fedHour:0, lamp:null, stamps:[], moments:[], gifts:{}, arrived:{}, found:[], lastVisit:null, preview:false });
 let save = fresh();
 try { const raw = localStorage.getItem(KEY); if (raw) save = Object.assign(fresh(), JSON.parse(raw)); } catch (e) {}
 const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} };
@@ -184,14 +187,14 @@ function glow(x, y, r, color, a){ if (a <= .005) return; const g = ctx.createRad
 /* neige au sol : réelle (épaisseur Open-Meteo), ou en train de tomber */
 let snowCover = 0, wetness = 0, lastFx = 0;
 function weatherCover(dt){
-  const kind = kindNow(), depth = real && sim.weather === 'auto' ? real.snowDepth : 0;
-  let target = sim.ground ? 1 : clamp(depth / .12, 0, 1);
+  const kind = kindNow(), depth = vue.meteo.snowDepth || 0;
+  let target = clamp(depth / .12, 0, 1);
   if (isSnow(kind)) target = Math.max(target, .55 + wx.snow*.3);
   snowCover += (target - snowCover) * Math.min(1, dt*.15);
   const wetTarget = isRain(kind) ? 1 : 0;
   wetness += (wetTarget - wetness) * Math.min(1, dt * (wetTarget ? .3 : .01));
 }
-function tempNow(){ return real && sim.weather === 'auto' ? real.temp : (isSnow(kindNow()) || sim.ground ? -3 : 12); }
+function tempNow(){ const t = vue.meteo.temp; return t != null ? Math.round(t) : 12; }
 
 function drawScene(w, info){
   const {e} = info.sun;
@@ -663,7 +666,9 @@ function drawGarden(L, season, snowy, wind){
 }
 
 /* ---------- État ---------- */
-let real = null;
+/* Le point de vue : l'instant et la météo que la scène dessine (meteo.js). Chaque image le recalcule ;
+   le récit de l'absence pourra en fournir d'autres. Sa météo porte toujours sa source. */
+let vue = MET.pointDeVue({ simulated:false }, MET.inconnue('attente'));
 const wx = { cloud:.3, rain:0, snow:0, fog:0, storm:0 };
 let flash = 0, lastFrame = performance.now(), clock = 0;
 const train = { phase:'idle', x:2000, t:0, stop:true, traveler:false };
@@ -671,7 +676,7 @@ const STOP_X = 560, CAR = 300, GAP = 0;
 const trav = { state:'none', x:0, walk:0, alpha:1 };
 let water = null, sweep = null, purr = null, lastTrainKey = null, panelStep = 0, cur = null;
 
-function kindNow(){ if (sim.weather !== 'auto') return sim.weather; return real ? real.kind : 'partly'; }
+function kindNow(){ return vue.meteo.kind; }
 
 /* ---------- Trains ---------- */
 /* la sonnerie du passage à niveau commence avant que le train n'apparaisse (t négatif) */
@@ -918,39 +923,47 @@ $('#lab-place').textContent = `Gare placée provisoirement à ${STATION.lat}° N
 { const n = tokyoAt(Date.now()); labDate.value = dayKey(n.y,n.m,n.d); }
 { const n = tokyoAt(Date.now()), list = CIEL.nextKo(Date.now(), 4); $('#lab-cal').textContent = 'Prochains kō : ' + list.map(s => `${KO[s.k][0]} le ${frDate(s.date.y,s.date.m,s.date.d)}`).join(' · '); }
 
-/* ---------- Météo réelle (Open-Meteo, gratuit, sans clé) ---------- */
-function wmo(c){
-  const code = c.weather_code, p = c.precipitation || 0;
-  if (code >= 95) return 'storm';
-  if ((code>=71&&code<=77) || code===85 || code===86) return (code===75 || code===86 || (c.snowfall||0) >= 1.5) ? 'heavysnow' : 'snow';
-  if (code>=51 && code<=57) return 'drizzle';
-  if ((code>=61&&code<=67) || (code>=80&&code<=82)) return (code===65 || code===67 || code===82 || p >= 4) ? 'heavyrain' : (p > 0 && p < .5 ? 'drizzle' : 'rain');
-  if (code===45 || code===48) return 'fog';
-  if (code===3 || c.cloud_cover > 75) return 'overcast';
-  if (code===2 || c.cloud_cover > 30) return 'partly';
-  return 'clear';
+/* ---------- Météo (js/meteo.js) ----------
+   Open-Meteo, gratuit, sans clé : des modèles météo pour ce lieu, pas une station d'observation.
+   Chaque mesure porte sa source. Seul l'Atelier simule, dans une mesure à part qui n'est jamais enregistrée. */
+const CACHE_METEO = 'nagori-meteo-v1';
+const magasin = MET.creerMagasin();
+try { const raw = localStorage.getItem(CACHE_METEO); if (raw) magasin.charger(raw, Date.now()); } catch (e) {}
+const clientMeteo = MET.creerClient({
+  magasin, lat: STATION.lat, lon: STATION.lon, jours: MET.joursPasses(save.lastVisit, Date.now()),
+  fetch: (url, opts) => fetch(url, opts),
+  apres: etat => { if (etat.echecs === 0) try { localStorage.setItem(CACHE_METEO, magasin.serialiser(Date.now())); } catch (e) {} }
+});
+clientMeteo.actualiser();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') clientMeteo.reveil(); });
+addEventListener('online', () => clientMeteo.reveil());
+
+/* la météo de l'instant dessiné : la dernière mesure réelle, ou la mesure réelle de l'heure simulée, ou rien.
+   Une date ou une heure simulée n'emprunte jamais la météo d'aujourd'hui. */
+function meteoPour(w){
+  let m;
+  if (ATELIER && (sim.hour != null || sim.date)) m = magasin.a(jstMs(w.y, w.m, w.d, w.hour));
+  else m = magasin.maintenant(Date.now(), clientMeteo.etat);
+  if (ATELIER && (sim.weather !== 'auto' || sim.ground || sim.wind != null))
+    m = MET.simulee(m, { kind: sim.weather !== 'auto' ? sim.weather : null, sol: sim.ground, vent: sim.wind });
+  return m;
 }
-let wxFailed = false;
-async function fetchWeather(){
-  const vars = 'temperature_2m,weather_code,cloud_cover,precipitation,snowfall,snow_depth,wind_speed_10m';
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${STATION.lat}&longitude=${STATION.lon}&current=${vars}&timezone=Asia%2FTokyo`;
-  try {
-    const ctl = new AbortController(); const to = setTimeout(()=>ctl.abort(), 8000);
-    const r = await fetch(url, { signal: ctl.signal }); clearTimeout(to);
-    if (!r.ok) throw new Error('http');
-    const c = (await r.json()).current;
-    real = { kind: wmo(c), temp: Math.round(c.temperature_2m), wind: c.wind_speed_10m || 0, snowDepth: c.snow_depth || 0, precip: c.precipitation || 0, raw: c };
-    wxFailed = false;
-    $('#wx-status').textContent = `Météo réelle reçue : ${WX_LABEL[real.kind]}, ${real.temp} °C, vent ${Math.round(real.wind)} km/h, neige au sol ${Math.round(real.snowDepth*100)} cm (code ${c.weather_code}).`;
-  } catch (e) {
-    real = null; wxFailed = true;
-    $('#wx-status').textContent = "Météo réelle indisponible : la scène affiche « quelques nuages » par défaut, et le bandeau l'indique.";
-  }
+/* vent de 0 à 1 et neige au sol, de la météo dessinée */
+function windNow(){ const v = vue.meteo.wind; return v != null ? clamp(v/45, 0, 1) : .15; }
+function groundSnow(){ return (vue.meteo.snowDepth || 0) >= .01; }
+/* la météo ne sert aux moments rares et au carnet que si elle est réelle */
+const MOMENTS_METEO = ['rainnight','dawnfog','snow','firstsnow','fireflies','tsukimi','fullmoon'];
+const momentSauvable = id => !MOMENTS_METEO.includes(id) || vue.meteo.source === 'reelle';
+/* ligne d'état de l'Atelier */
+function statutMeteo(){
+  const m = vue.meteo, e = clientMeteo.etat, t = ms => ms ? MET.hhmm(ms) : '--:--';
+  let l;
+  if (m.source === 'simulee') l = `Météo simulée par l'Atelier (${WX_LABEL[m.kind]}) : jamais enregistrée, jamais comptée pour le carnet.`;
+  else if (m.source === 'reelle') l = `Météo réelle de modèles Open-Meteo (pas une station) : ${WX_LABEL[m.kind]}, ${m.temp != null ? Math.round(m.temp) : '?'} °C, vent ${m.wind != null ? Math.round(m.wind) : '?'} km/h, neige au sol ${Math.round((m.snowDepth||0)*100)} cm (code ${m.code}). Valeur de ${m.t.replace('T',' ')}, reçue à ${t(m.recu)} (heure de Tokyo).`;
+  else l = `Météo inconnue (${m.statut}) : ciel couvert neutre, rien ne tombe, aucun moment ni conséquence météo.${m.neigeRetenue ? ' Neige au sol conservée (dernière mesure de moins de 24 h).' : ''}`;
+  if (e.echecs) l += ` Dernière requête en échec (${e.erreur}) : nouvelle tentative à ${t(e.prochain)}.`;
+  return `${l} Heures réelles en mémoire : ${magasin.nombre()}.`;
 }
-fetchWeather(); setInterval(fetchWeather, 15*60e3);
-/* vent de 0 à 1 et neige au sol, réels ou simulés */
-function windNow(){ if (sim.wind != null && ATELIER) return sim.wind; return real ? clamp(real.wind/45, 0, 1) : .15; }
-function groundSnow(){ if (sim.ground) return true; return !!(real && sim.weather === 'auto' && real.snowDepth >= .01); }
 
 /* ---------- Boucle ---------- */
 let lastHud = 0;
@@ -958,10 +971,11 @@ function hud(w, info){
   const s = SEKKI[info.season.i], k = KO[info.season.ko], kind = kindNow();
   $('#date-label').textContent = frDate(w.y,w.m,w.d);
   $('#clock').innerHTML = hhmm(w.hour) + (w.simulated ? '<small>simulé</small>' : '');
-  let wxText;
-  if (sim.weather !== 'auto') wxText = tx(T.meteoSimulee, {meteo: WX_LABEL[kind]});
-  else if (real){ wxText = `${WX_LABEL[kind]} · ${real.temp} °C`; if (real.wind >= 30) wxText += ` · ${T.vent}`; if (groundSnow() && !isSnow(kind)) wxText += ` · ${T.neigeAuSol}`; }
-  else wxText = wxFailed ? T.meteoIndispo : T.meteoAttente;
+  const mt = vue.meteo; let wxText;
+  if (mt.source === 'simulee') wxText = tx(T.meteoSimulee, {meteo: WX_LABEL[kind]});
+  else if (mt.source === 'reelle'){ wxText = WX_LABEL[kind] + (mt.temp != null ? ` · ${Math.round(mt.temp)} °C` : ''); if (mt.wind >= 30) wxText += ` · ${T.vent}`; if (groundSnow() && !isSnow(kind)) wxText += ` · ${T.neigeAuSol}`; if (mt.ancienne) wxText += ' · ' + tx(T.meteoDe, {heure: MET.hhmm(mt.recu)}); }
+  else { wxText = mt.statut === 'attente' ? T.meteoAttente : mt.statut === 'heure-inconnue' ? T.meteoInconnue : T.meteoIndispo; if (groundSnow()) wxText += ` · ${T.neigeAuSol}`; }
+  $('#wx-status').textContent = statutMeteo();
   $('#sub').textContent = `${phaseLabel(info.sun)} · ${wxText}`;
   $('#next-train').textContent = train.phase==='idle' ? tx(T.prochainArret, {heure: nextStop(w.hour)}) : train.phase==='pass' ? T.trainPasse : train.phase==='stop' ? T.trainEnGare : T.trainApproche;
   const st = info.tstate; let tl = '';
@@ -980,13 +994,13 @@ function hud(w, info){
   $('#lab-hour-val').textContent = hhmm(sim.hour != null ? sim.hour : w.hour);
   if (!save.stamps.includes(info.season.ko)){ save.stamps.push(info.season.ko); persist(); son.event('tampon'); toast(tx(T.nouveauTampon, {ko: koName(info.season.ko)})); }
   const best = info.active.map(id=>MOMENTS.find(m=>m.id===id)).sort((a,b)=>RANK[b.rar]-RANK[a.rar])[0];
-  const mEl = $('#moment'); if (best){ mEl.hidden = false; mEl.textContent = `${best.rar} · ${best.name}`; } else mEl.hidden = true;
-  for (const id of info.active) if (!save.moments.includes(id)){
+  const mEl = $('#moment'); if (best){ mEl.hidden = false; mEl.textContent = `${best.rar} · ` + (momentSauvable(best.id) ? best.name : tx(T.momentSimule, {moment: best.name})); } else mEl.hidden = true;
+  for (const id of info.active) if (!save.moments.includes(id) && momentSauvable(id)){
     save.moments.push(id);
     if (id === 'firstsnow') save.firstSnow = w.m >= 7 ? w.y : w.y-1;
     persist(); toast(tx(T.momentAjoute, {moment: MOMENTS.find(m=>m.id===id).name}));
   }
-  if (info.active.includes('firstsnow') && save.moments.includes('firstsnow')) { save.firstSnow = w.m >= 7 ? w.y : w.y-1; persist(); }
+  if (info.active.includes('firstsnow') && save.moments.includes('firstsnow') && momentSauvable('firstsnow')) { save.firstSnow = w.m >= 7 ? w.y : w.y-1; persist(); }
   // gestes
   const td = dayKey(w.y,w.m,w.d);
   $('#g-water').classList.toggle('done', save.watered === td);
@@ -1007,6 +1021,7 @@ function frame(now){
   const dt = Math.min(.1, (now - lastFrame)/1000); lastFrame = now; clock += dt;
   if (sim.fast && sim.hour != null) sim.hour = (sim.hour + dt*.25) % 24;
   const w = worldTime(); cur = w;
+  vue = MET.pointDeVue(w, meteoPour(w));
   if (!cam.drag && Math.abs(cam.vel) > .05){ cam.pan += cam.vel; cam.vel *= .92; layoutCam(); }
   if (sweep){ sweep.t += dt; if (sweep.t >= 1.2){ sweep = null; save.swept = Date.now(); persist(); toast(T.quaiBalaye); } }
   const info = computeInfo(w);
@@ -1019,7 +1034,7 @@ function frame(now){
   drawScene(w, info);
   const tc = train.x + CAR/2;
   son.update({ rain: wx.rain, snow: wx.snow, wind: windNow(), fog: wx.fog, storm: wx.storm, night: info.night, sunE: info.sun.e,
-    ko: info.season.ko, temp: real && sim.weather === 'auto' ? real.temp : 12, lampOn: info.lampOn, furin: hasGift(0), ground: groundSnow(),
+    ko: info.season.ko, temp: vue.meteo.source === 'reelle' ? tempNow() : 12, lampOn: info.lampOn, furin: hasGift(0), ground: groundSnow(),
     bell: crossingActive(), train: train.phase === 'idle' ? null : { dist: Math.abs(tc - 790), speed: (train.v||0) / PX_PER_M, pan: clamp((tc - 790)/900, -1, 1) } });
   if (now - lastHud > 400){ lastHud = now; hud(w, info); }
   requestAnimationFrame(frame);

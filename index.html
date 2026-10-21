@@ -66,7 +66,7 @@
         <button id="btn-book">Carnet<span class="count" id="book-count">0/72</span></button>
         <button id="btn-lab" hidden>Atelier</button>
       </nav>
-      <div class="foot">Nagori · version de travail · textes et dessins provisoires</div>
+      <div class="foot">Nagori · version de travail · textes et dessins provisoires · Météo : modèles <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> pour ce lieu, pas une station d'observation</div>
     </div>
   </div>
 
@@ -88,6 +88,7 @@
     <div class="list" id="found"></div>
     <h3>Les 72 kō</h3>
     <div class="book-grid" id="book-grid"></div>
+    <div class="note">Météo : modèles <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> pour ce lieu, pas une station d'observation.</div>
   </aside>
 
   <aside class="panel lab" id="lab" hidden aria-label="Atelier de test">
@@ -141,6 +142,7 @@
 <script src="data/textes.js?v=202610181605"></script>
 <script src="js/ciel.js?v=202610181605"></script>
 <script src="js/son.js?v=202610181605"></script>
+<script src="js/meteo.js?v=202610181605"></script>
 <script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
 <script src="js/jeu.js?v=202610181605"></script>
 </body>

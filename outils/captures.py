@@ -9,7 +9,11 @@ Le jeu est servi depuis le dossier du dépôt, avec le Chromium de l'espace de t
 - l'horloge du navigateur est simulée et avance par pas fixes ;
 - Math.random est remplacé par un tirage reproductible ;
 - les polices distantes et Open-Meteo sont coupés (la météo vient de l'Atelier).
-Chaque état règle date, heure, météo et neige au sol par l'Atelier (?atelier)."""
+Chaque état règle date, heure, météo et neige au sol par l'Atelier (?atelier).
+
+Bruit : la pluie et la neige ne sont pas reproductibles à l'image près. Deux prises du même code donnent
+environ 0,06 % de pixels différents sans précipitation, et 1,2 % avec de la pluie. Au-dessus, regarder les
+images dans DOSSIER/diff avant de conclure."""
 import argparse, contextlib, datetime, http.server, pathlib, socketserver, sys, threading
 from PIL import Image, ImageChops
 
