@@ -52,6 +52,12 @@
           <button id="tr-later">Plus tard</button>
         </div>
       </section>
+      <section class="card traveler etagere" id="etagere" hidden aria-label="Étagère de la salle d'attente">
+        <div class="eyebrow" id="et-titre"></div>
+        <div class="sub" id="et-etat"></div>
+        <div class="et-liste" id="et-liste"></div>
+        <div class="row"><button id="et-fermer">Fermer</button></div>
+      </section>
       <div class="toast" id="toast" hidden></div>
       <div class="gestures" aria-label="Gestes du jour">
         <span class="label">Gestes du jour</span>
@@ -123,6 +129,13 @@
     <div class="note" id="wx-status">Recherche de la météo réelle…</div>
     <div class="note" id="lab-cal"></div>
 
+    <h3>Objets et traces (aperçu, rien n'est enregistré)</h3>
+    <label for="lab-trace">Montrer une trace</label>
+    <select id="lab-trace"><option value="">Aucune</option></select>
+    <label class="check" for="lab-habitude"><input type="checkbox" id="lab-habitude"> avec la trace d'habitude</label>
+    <label class="check" for="lab-givre"><input type="checkbox" id="lab-givre"> Givre sur le banc et les rails</label>
+    <div class="note" id="lab-objets"></div>
+
     <h3>Scènes</h3>
     <div class="row">
       <button class="primary" id="lab-traveler">Faire venir le voyageur</button>
@@ -143,6 +156,8 @@
 <script src="js/ciel.js?v=202610181605"></script>
 <script src="js/son.js?v=202610181605"></script>
 <script src="js/meteo.js?v=202610181605"></script>
+<script src="data/objets.js?v=202610181605"></script>
+<script src="js/objets.js?v=202610181605"></script>
 <script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
 <script src="js/jeu.js?v=202610181605"></script>
 </body>

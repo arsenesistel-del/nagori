@@ -11,6 +11,7 @@ const GIFTS = N.OMIYAGE.map(o => o.nom), ITEMS = N.OBJETS.map(o => o.nom);
 const MOMENTS = N.MOMENTS.map(m => ({ id: m.id, name: m.nom, rar: m.rar }));
 const RANK = {'Peu commun':1,'Rare':2,'Légendaire':3};
 const WX_LABEL = T.meteo;
+const OBJ = N.objets, POSES = N.POSES;   /* js/objets.js, data/objets.js : les trois objets à laisser */
 const MET = N.meteo;                 /* js/meteo.js : sources de la météo, panne, point de vue */
 /* remplace {mot} par sa valeur */
 const tx = (str, vars = {}) => String(str).replace(/\{(\w+)\}/g, (_, k) => vars[k] != null ? vars[k] : '');
@@ -28,7 +29,8 @@ const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const KEY = 'nagori-maquette-v2';
 /* version : 3 depuis le prototype de 14 jours. Les champs ajoutés viennent ici, avec leur valeur par défaut :
    l'ancienne sauvegarde est fusionnée par-dessus au chargement, sans migration. */
-const fresh = () => ({ version:3, growth:0, watered:null, swept:null, fed:null, fedHour:0, lamp:null, stamps:[], moments:[], gifts:{}, arrived:{}, found:[], lastVisit:null, preview:false });
+const nouveauSel = () => { try { return Array.from(crypto.getRandomValues(new Uint32Array(2))).map(n => n.toString(36)).join(''); } catch (e) { return Math.random().toString(36).slice(2) + Date.now().toString(36); } };
+const fresh = () => ({ version:3, growth:0, watered:null, swept:null, fed:null, fedHour:0, lamp:null, stamps:[], moments:[], gifts:{}, arrived:{}, found:[], lastVisit:null, preview:false, objets:Object.assign(OBJ.etatVide(), { sel: nouveauSel() }) });
 let save = fresh();
 try { const raw = localStorage.getItem(KEY); if (raw) save = Object.assign(fresh(), JSON.parse(raw)); } catch (e) {}
 const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} };
@@ -298,13 +300,17 @@ function drawScene(w, info){
     // le chemin tassé devant la porte et le banc
     ctx.fillStyle = col([200,206,216], .35+.65*L, .5); ctx.fillRect(470, 678, 330, 6);
   }
+  drawEmpreintes(L, snowy);
   drawReflections(L, night, info);
   drawDebris(L, season, info);
   drawMailbox(L, snowy);
   drawStation(L, night, snowy, info, temp, wind);
+  drawObjets(L, night, snowy);
   drawVending(L, night, snowy);
   drawLamp(L, night, info.lampOn, snowy);
-  drawBench(L, snowy);
+  { const dx = bancDecale(); ctx.save(); ctx.translate(dx, 0); drawBench(L, snowy); ctx.restore(); }
+  drawObjetsBanc(L);
+  drawGivre(L, train.phase === 'idle');
   drawSign(L, night, snowy);
   drawBowl(L);
   drawItem(L, info.item);
@@ -541,6 +547,154 @@ function drawItem(L, item){
   else if (item.idx === 2){ ctx.fillStyle = col([186,44,44],k); ctx.fillRect(x-30, y-3, 22, 4); ctx.fillRect(x-10, y-3, 4, 14); }
   else { ctx.fillStyle = col([70,80,60],k); ctx.fillRect(x-24, y-5, 13, 5); }
 }
+/* ---------- Objets posés, étagère et traces (lots C et D) ----------
+   Le moteur (js/objets.js) décide ; ici on ne fait que dessiner et recevoir les gestes.
+   Aperçu de l'Atelier : une trace montrée sans rien enregistrer. */
+let apercuTrace = null, apercuGivre = false;
+
+/* ce qui est posé ou laissé, tel que la scène doit le montrer */
+function etatObjets(){
+  const o = save.objets, ap = apercuTrace;
+  if (ap) {
+    if (ap.type === 'retour') return { pose: null, tr: null, retour: { trace: ap.trace }, out: false, habitude: false };
+    return { pose: null, tr: ap, retour: null, out: !!ap.emprunt, habitude: !!ap.habitude };
+  }
+  return { pose: o.pose ? o.pose.type : null, tr: o.trace, retour: o.retourTrace, out: !!o.parapluieRetour, habitude: !!(o.trace && o.trace.habitude) };
+}
+
+function fil(x, y){ ctx.fillStyle = 'rgba(200,50,44,.95)'; ctx.fillRect(x, y, 2, 2); }          // la trace d'habitude : un fil rouge noué
+
+function dessinThermos(x, base, k, o = {}){
+  ctx.fillStyle = col([58,100,96], k); ctx.fillRect(x-4, base-16, 8, 16);
+  ctx.fillStyle = col([180,190,186], k); ctx.fillRect(x-4, base-12, 8, 1.2);
+  if (o.ouvert){
+    ctx.fillStyle = col([30,40,40], k); ctx.fillRect(x-3, base-17, 6, 2);
+    ctx.fillStyle = col([220,220,214], k); ctx.fillRect(x+7, base-3, 7, 3);
+  } else {
+    ctx.fillStyle = col([222,222,214], k); ctx.fillRect(x-4.5, base-19, 9, 3.5);
+    if (o.givre){ ctx.fillStyle = `rgba(240,248,255,${.4+.55*k})`; ctx.fillRect(x-5, base-20, 10, 2); ctx.fillRect(x-4, base-16, 8, 1.5); }
+  }
+  if (o.fil) fil(x-1, base-19);
+}
+function dessinTasse(x, base, k, renversee){
+  ctx.fillStyle = col([236,230,214], k);
+  if (renversee){ ctx.fillRect(x-4, base-6, 8, 6); ctx.fillStyle = col([200,194,178], k); ctx.fillRect(x-4, base-6, 8, 1.2); }
+  else { ctx.fillRect(x-4, base-6, 8, 6); ctx.fillStyle = col([60,44,34], k); ctx.fillRect(x-3, base-6, 6, 1.6); }
+}
+function dessinParapluie(x, base, k, o = {}){
+  ctx.strokeStyle = col([60,52,46], k); ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.moveTo(x, base-4); ctx.lineTo(x+1, base-34); ctx.arc(x+4, base-34, 3, Math.PI, 0.2*Math.PI, true); ctx.stroke();
+  ctx.fillStyle = col([44,64,96], k); ctx.beginPath(); ctx.moveTo(x-1, base-8); ctx.lineTo(x-4, base-28); ctx.lineTo(x+3, base-30); ctx.lineTo(x+3, base-8); ctx.closePath(); ctx.fill();
+  if (o.neige){ ctx.fillStyle = col(C.snow, .5+.5*k); ctx.beginPath(); ctx.ellipse(x-.5, base-29, 5, 2.4, -.1, 0, 7); ctx.fill(); ctx.fillRect(x-3, base-27, 4, 5); }
+  if (o.fil) fil(x+3, base-37);
+}
+
+function drawObjets(L, night, snowy){
+  const e = etatObjets(), k = .25+.75*L, tr = e.tr, vis = tr && tr.visuel;
+  const pose = e.pose;
+  /* — l'étagère, dans la fenêtre de droite — */
+  const sx = 550, sy = 623;
+  ctx.fillStyle = col(C.woodDark, k); ctx.fillRect(sx, sy, 42, 3);
+  const thermosEtagere = pose !== 'thermos' && !(tr && tr.type === 'thermos');
+  const parapluieEtagere = pose !== 'parapluie' && !(tr && tr.type === 'parapluie') && !e.out && !e.retour;
+  if (thermosEtagere){ ctx.fillStyle = col([40,70,68], .5+.5*L); ctx.fillRect(sx+5, sy-13, 6, 13); ctx.fillStyle = col([160,160,154], .5+.5*L); ctx.fillRect(sx+4.5, sy-15, 7, 3); }
+  if (parapluieEtagere){ ctx.strokeStyle = col([36,48,70], .5+.5*L); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(sx+19, sy); ctx.lineTo(sx+23, sy-24); ctx.stroke(); }
+  /* la lanterne : allumée si on l'a posée, ou si la nuit a laissé une trace de lumière */
+  const lanterneAllumee = pose === 'lumiere' || (tr && tr.type === 'lumiere' && vis !== 'renard' && vis !== 'banc-deplace');
+  const lx = sx+33, ly = sy;
+  ctx.fillStyle = col([50,44,40], .5+.5*L); ctx.fillRect(lx, ly-12, 8, 12); ctx.fillRect(lx-1, ly-14, 10, 2);
+  if (lanterneAllumee){
+    const vacille = vis === 'gresille' ? .55 + .45*Math.sin(clock*23)*Math.sin(clock*9) : 1;
+    ctx.fillStyle = `rgba(255,214,140,${.9*Math.max(0, vacille)})`; ctx.fillRect(lx+1.5, ly-10, 5, 8);
+    glow(lx+4, ly-6, 38, '255,190,110', (.35 + .35*night) * Math.max(0, vacille));
+  }
+  if (tr && tr.type === 'lumiere' && e.habitude) fil(lx+3, ly-16);
+  if (vis === 'chat-vitre'){                          // le chat, enroulé sur l'étagère, derrière la vitre
+    ctx.fillStyle = col([52,46,44], .5+.5*L); ctx.beginPath(); ctx.ellipse(sx+17, sy-5, 10, 5, 0, 0, 7); ctx.fill(); ctx.beginPath(); ctx.arc(sx+26, sy-8, 4, 0, 7); ctx.fill();
+    ctx.fillRect(sx+23.5, sy-13, 2, 3); ctx.fillRect(sx+27, sy-13, 2, 3);
+  }
+  if (vis === 'givre-vitre'){                         // givre en fougère sur la vitre
+    ctx.strokeStyle = `rgba(236,246,255,${.35+.5*L})`; ctx.lineWidth = .9;
+    for (const [bx, by, dir] of [[550,632,1],[594,632,-1],[550,598,1],[594,598,-1]]){
+      for (let i = 0; i < 4; i++){
+        const a = (dir > 0 ? -.8 : -Math.PI+.8) - i*.05*dir, len = 22 - i*3;
+        ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + Math.cos(a)*len*(by>615?1:1), by + (by>615 ? -Math.abs(Math.sin(a))*len : Math.abs(Math.sin(a))*len)); ctx.stroke();
+      }
+    }
+    ctx.fillStyle = `rgba(236,246,255,${.12+.12*L})`; ctx.fillRect(550, 598, 44, 34);
+  }
+  if (vis === 'renard' || (tr && tr.type === 'lumiere' && vis === 'renard')){        // quelques poils roux sur la marche
+    ctx.fillStyle = col([196,110,52], k); for (const [dx, dy] of [[0,0],[3,1],[6,-1],[2,-2]]) ctx.fillRect(490+dx, 682+dy, 2, 1);
+  }
+
+  /* — le porte-parapluie, près de la porte — */
+  const bx = 536, bb = 680;
+  ctx.fillStyle = col([76,86,88], k); ctx.fillRect(bx-9, bb-14, 18, 14); ctx.fillStyle = col([52,60,62], k); ctx.fillRect(bx-10, bb-15, 20, 2);
+  const dansLePorte = pose === 'parapluie' || vis === 'plein';
+  if (dansLePorte) dessinParapluie(bx, bb-6, k, { neige: vis === 'plein' && tr.contexte && tr.contexte.neige, fil: e.habitude && tr && tr.type === 'parapluie' });
+  if (e.retour){
+    dessinParapluie(bx, bb-6, k, { fil: false });
+    const t = e.retour.trace;
+    if (t === 'mandarines'){ ctx.fillStyle = col([232,140,46], k); for (const [dx, dy] of [[12,-3],[17,-3],[14.5,-8]]){ ctx.beginPath(); ctx.arc(bx+dx, bb+dy, 3.2, 0, 7); ctx.fill(); } }
+    if (t === 'ticket'){ ctx.fillStyle = col([236,232,214], k); ctx.fillRect(bx+4, bb-36, 8, 5); ctx.fillStyle = col([186,60,52], k); ctx.fillRect(bx+4, bb-36, 8, 1.4); }
+    if (t === 'mot-tableau'){ ctx.fillStyle = col([240,238,228], k); ctx.fillRect(386, 654, 12, 9); ctx.fillStyle = col([60,60,70], k); ctx.fillRect(388, 657, 8, .8); ctx.fillRect(388, 659.5, 6, .8); }
+  }
+
+}
+
+/* le thermos et les tasses, posés sur le banc (dessinés après le banc, avant les personnages) */
+function drawObjetsBanc(L){
+  const e = etatObjets(), k = .25+.75*L, tr = e.tr, vis = tr && tr.visuel, pose = e.pose;
+  const tbx = 782, tbb = 661;
+  if (pose === 'thermos') dessinThermos(tbx, tbb, k);
+  if (tr && tr.type === 'thermos'){
+    const f = e.habitude;
+    if (vis === 'tasse-retournee'){ dessinThermos(tbx, tbb, k, { fil: f }); dessinTasse(tbx+12, tbb, k, true); }
+    else if (vis === 'refermé'){ ctx.fillStyle = col([236,234,226], k); ctx.fillRect(tbx-6, tbb-1.4, 12, 1.4); dessinThermos(tbx, tbb-1.4, k, { fil: f }); }
+    else if (vis === 'tasse-banc'){ dessinThermos(tbx, tbb, k, { fil: f }); dessinTasse(751, tbb, k, false); }
+    else if (vis === 'couvercle-givre'){ dessinThermos(tbx, tbb, k, { givre: !!(tr.contexte && tr.contexte.gel) || apercuTrace, fil: f }); }
+    else if (vis === 'tasse-rincee'){ dessinThermos(tbx, tbb, k, { fil: f }); dessinTasse(tbx+12, tbb, k, true); ctx.fillStyle = 'rgba(190,214,236,.8)'; ctx.fillRect(tbx+12, tbb+.5, 1, 2); ctx.fillRect(tbx+16, tbb+1, 1, 2); }
+    else if (vis === 'ouvert-vide'){ dessinThermos(tbx, tbb, k, { ouvert: true, fil: f }); }
+  }
+}
+
+/* le banc déplacé par quelqu'un qui s'est abrité */
+const bancDecale = () => { const e = etatObjets(); return e.tr && e.tr.visuel === 'banc-deplace' ? 14 : 0; };
+
+/* empreintes dans la neige : direction, et effacement selon la neige réelle tombée depuis */
+const PAS_TRACES = { ecolier: [1180, 505, 3.2, 9], botte: [1255, 640, 4.4, 13], 'botte-porte': [720, 500, 4.4, 13], renard: [1100, 575, 2.4, 15] };
+function empreintesVisibles(snowy){
+  const tr = etatObjets().tr;
+  if (!tr || !tr.empreintes || !snowy || !PAS_TRACES[tr.empreintes]) return null;
+  const etat = apercuTrace ? 'net' : OBJ.empreinte(magasin, tr.quand, Date.now()).etat;
+  if (etat === 'aucune' || etat === 'efface') return null;
+  return { tr, etat, spec: PAS_TRACES[tr.empreintes] };
+}
+function drawEmpreintes(L, snowy){
+  const v = empreintesVisibles(snowy); if (!v) return;
+  const [a, b, taille, pas] = v.spec, dir = v.tr.sens >= 0 ? -1 : 1;     // sens 1 : vers la gare
+  const x0 = Math.min(a, b), x1 = Math.max(a, b);
+  ctx.fillStyle = col([128,140,168], .35+.65*L, v.etat === 'net' ? .8 : .3);
+  let i = 0;
+  for (let x = x0; x <= x1; x += pas, i++){
+    const y = 679 + (i % 2 ? 2.4 : -1.2);
+    ctx.beginPath(); ctx.ellipse(x, y, taille, taille*.45, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x + dir*taille*.9, y, taille*.45, taille*.3, 0, 0, 7); ctx.fill();
+  }
+}
+
+/* givre sur le banc et les rails : sous 0 °C, air humide, mesures réelles seulement */
+function givreActif(){
+  const m = vue.meteo;
+  return apercuGivre || (m.source === 'reelle' && m.temp != null && m.temp < 0 && m.hum != null && m.hum >= 80);
+}
+function drawGivre(L, avecRails){
+  if (!givreActif()) return;
+  ctx.fillStyle = `rgba(236,244,255,${.35+.5*L})`;
+  ctx.fillRect(740, 660, 92, 1.4); ctx.fillRect(740, 641, 92, 1); ctx.fillRect(740, 649, 92, .8);
+  if (avecRails){ ctx.fillRect(0, 650.4, 1600, 1.1); ctx.fillRect(0, 660.4, 1600, 1.1); }
+}
+
 function drawDebris(L, season, info){
   const amount = info.debris * (1 - clamp(snowCover*1.6, 0, 1)); if (amount <= .02) return;
   const n = Math.floor(LEAVES.length * amount), c = DEBRIS[season], cut = sweep ? 240 + sweep.t/1.2*960 : -1;
@@ -840,6 +994,20 @@ function sceneHit(ev){
   if (info.cat){ const [cx,cy] = CAT_POS[info.cat]; if (Math.abs(x-cx) < 26 && Math.abs(y-cy+8) < 22) return 'cat'; }
   if (info.item && x > 800 && x < 856 && y > 625 && y < 690) return 'item';
   if (info.waiting && trav.state==='none' && x > 736 && x < 790 && y > 600 && y < 686) return 'traveler';
+  { const e = etatObjets();
+    if (x > 546 && x < 596 && y > 618 && y < 636) return 'etagere';
+    if (x > 546 && x < 596 && y > 596 && y < 618 && e.tr && e.tr.type === 'lumiere') return 'trace:' + e.tr.visuel;
+    if (x > 522 && x < 552 && y > 640 && y < 684){ if (e.retour) return 'trace:' + (e.retour.trace || 'plie-seche'); if (e.tr && e.tr.type === 'parapluie') return 'trace:' + (e.tr.visuel === 'plein' && e.tr.contexte && e.tr.contexte.neige ? 'plein-neige' : e.tr.visuel); if (e.pose === 'parapluie') return 'etagere'; }
+    if (x > 738 && x < 832 && y > 628 && y < 664){ if (e.tr && e.tr.type === 'thermos') return 'trace:' + e.tr.visuel; if (e.pose === 'thermos') return 'etagere'; }
+    if (e.tr && e.tr.visuel === 'renard' && x > 484 && x < 500 && y > 676 && y < 688) return 'trace:renard';
+    if (e.tr && e.tr.visuel === 'banc-deplace' && x > 750 && x < 848 && y > 636 && y < 664) return 'trace:banc-deplace';
+    if (x > 376 && x < 424 && y > 646 && y < 674 && e.retour && e.retour.trace === 'mot-tableau') return 'trace:mot-tableau';
+    if (e.retour && e.retour.trace === 'ticket' && x > 538 && x < 552 && y > 640 && y < 650) return 'trace:ticket';
+    if (e.tr && e.habitude && Math.abs(x - 782) < 12 && y > 636 && y < 664 && e.tr.type === 'thermos') return 'trace:habitude';
+    const ep = empreintesVisibles(snowCover > .25);
+    if (ep && y > 672 && y < 690 && x >= Math.min(ep.spec[0], ep.spec[1]) - 8 && x <= Math.max(ep.spec[0], ep.spec[1]) + 8) return 'trace:pas-' + ep.tr.empreintes;
+    if (givreActif() && x > 738 && x < 834 && y > 636 && y < 664) return 'trace:givre-banc';
+  }
   if (x > 550 && x < 750 && y > 700 && y < 800) return 'garden';
   if (x > 652 && x < 684 && y > 670 && y < 694) return 'bowl';
   if (x > 676 && x < 712 && y > 544 && y < 682) return 'lamp';
@@ -879,7 +1047,44 @@ cv.addEventListener('click', ev => {
   else if (hit==='bowl') gFeed();
   else if (hit==='lamp') gLamp();
   else if (hit==='platform') gSweep();
+  else if (hit==='etagere') ouvrirEtagere();
+  else if (hit.startsWith('trace:')) toast(T.traces[hit.slice(6)] || T.traces[hit.slice(6).replace(/^pas-.*/, 'pas-ecolier')] || '');
 });
+
+/* Atelier et tests : coordonnées d'écran d'un point de la scène (1600 × 900) */
+if (new URLSearchParams(location.search).has('atelier')) N.ecran = (x, y) => { const r = cv.getBoundingClientRect(); return [r.left + OX + x*S, r.top + OY + y*S]; };
+
+/* ---------- Étagère de la salle d'attente (lot C) ----------
+   On pose un objet ou on le reprend. Ni compteur, ni indice, ni probabilité ; ne rien poser n'a aucun effet. */
+const elevGare = ms => CIEL.sunAltAz(ms, STATION.lat, STATION.lon).elev;
+function objetsTick(){
+  const evts = OBJ.avancer(POSES, save.objets, Date.now(), magasin, elevGare);
+  if (evts.length){ persist(); if (!$('#etagere').hidden) renderEtagere(); }
+}
+function renderEtagere(){
+  const E = T.etagere, o = save.objets;
+  $('#et-titre').textContent = E.titre;
+  $('#et-etat').textContent = o.pose ? tx(E.pose, { objet: E.objets[o.pose.type].toLowerCase() }) : E.libre;
+  const liste = $('#et-liste'); liste.innerHTML = '';
+  for (const type of OBJ.TYPES){
+    const ligne = document.createElement('div'); ligne.className = 'et-ligne';
+    const nom = document.createElement('span'); nom.textContent = E.objets[type];
+    const b = document.createElement('button'); b.className = 'chip';
+    const estPose = o.pose && o.pose.type === type;
+    if (estPose) { b.textContent = E.reprendre; b.className = 'chip done'; }
+    else if (type === 'parapluie' && o.parapluieRetour) { b.textContent = E.absent; b.disabled = true; }
+    else if (o.pose) { b.textContent = E.poser; b.disabled = true; b.title = E.unSeul; }
+    else b.textContent = E.poser;
+    b.addEventListener('click', () => {
+      if (estPose){ OBJ.reprendre(o); toast(tx(E.repriseToast, { objet: E.objets[type] })); }
+      else if (OBJ.poser(o, type, Date.now()).ok) toast(tx(E.poseToast, { objet: E.objets[type] }));
+      persist(); objetsTick(); renderEtagere();
+    });
+    ligne.append(nom, b); liste.appendChild(ligne);
+  }
+}
+function ouvrirEtagere(){ renderEtagere(); $('#etagere').hidden = false; }
+$('#et-fermer').addEventListener('click', () => { $('#etagere').hidden = true; });
 
 /* panneaux */
 const book = $('#book'), lab = $('#lab'), reg = $('#reg');
@@ -917,6 +1122,23 @@ $('#lab-traveler').addEventListener('click', () => {
   if (!startTrain({stop:true, traveler:true})) toast('Un train est déjà là.');
 });
 $('#lab-away').addEventListener('click', () => { openRegistre(Date.now() - 15*36e5); });
+/* aperçu des traces : montre sans rien enregistrer */
+{
+  const sel = $('#lab-trace');
+  for (const type of OBJ.TYPES) for (const e of POSES[type]) { const o = document.createElement('option'); o.value = type + ':' + e.id; o.textContent = `${T.etagere.objets[type]} · ${e.id} (${e.visuel})`; sel.appendChild(o); }
+  for (const r of ['plie-seche', 'mot-tableau', 'mandarines', 'ticket']) { const o = document.createElement('option'); o.value = 'retour:' + r; o.textContent = 'Parapluie rendu · ' + r; sel.appendChild(o); }
+  const maj = () => {
+    const v = sel.value;
+    if (!v){ apercuTrace = null; return; }
+    const [type, id] = v.split(':');
+    if (type === 'retour'){ apercuTrace = { type: 'retour', trace: id }; return; }
+    const e = POSES[type].find(x => x.id === id);
+    apercuTrace = { type, id, habitue: e.habitue || null, visuel: e.visuel, empreintes: e.empreintes || null, emprunt: !!e.emprunt, habitude: $('#lab-habitude').checked,
+      quand: Date.now() - 3*36e5, sens: 1, contexte: { neige: true, gel: true, pluie: true } };
+  };
+  sel.addEventListener('change', maj); $('#lab-habitude').addEventListener('change', maj);
+  $('#lab-givre').addEventListener('change', ev => { apercuGivre = ev.target.checked; });
+}
 $('#lab-gifts').addEventListener('click', () => { save.preview = !save.preview; persist(); toast(save.preview ? 'Aperçu : la gare avec six omiyage.' : 'Aperçu retiré.'); });
 $('#lab-reset').addEventListener('click', () => { save = fresh(); save.lastVisit = Date.now(); persist(); bookSig = ''; renderBook(-1); $('#traveler').hidden = true; toast('Tout est remis à zéro.'); });
 $('#lab-place').textContent = `Gare placée à ${STATION.lat}° N, ${STATION.lon}° E : ${STATION.place}. Arrêts à ${TRAINS.filter(t=>t.stop).map(t=>hhmm(t.h+t.m/60)).join(', ')} ; trains sans arrêt à ${TRAINS.filter(t=>!t.stop).map(t=>hhmm(t.h+t.m/60)).join(', ')}.`;
@@ -1017,6 +1239,7 @@ function checkSchedule(w){
   const mins = Math.floor(w.hour*60);
   for (const t of TRAINS){ const tm = t.h*60+t.m; if (mins === tm){ const key = `${dayKey(w.y,w.m,w.d)}-${tm}`; if (key !== lastTrainKey){ lastTrainKey = key; const st = travelerState(w); const isTv = t.h===N.VOYAGEUR.h && t.m===N.VOYAGEUR.m && dayKey(st.tv.day.y,st.tv.day.m,st.tv.day.d)===dayKey(w.y,w.m,w.d) && !st.welcomed && !save.arrived[st.tv.key]; startTrain({stop:t.stop, traveler:isTv}); } } }
 }
+let lastObjets = -1e9;
 function frame(now){
   const dt = Math.min(.1, (now - lastFrame)/1000); lastFrame = now; clock += dt;
   if (sim.fast && sim.hour != null) sim.hour = (sim.hour + dt*.25) % 24;
@@ -1036,6 +1259,7 @@ function frame(now){
   son.update({ rain: wx.rain, snow: wx.snow, wind: windNow(), fog: wx.fog, storm: wx.storm, night: info.night, sunE: info.sun.e,
     ko: info.season.ko, temp: vue.meteo.source === 'reelle' ? tempNow() : 12, lampOn: info.lampOn, furin: hasGift(0), ground: groundSnow(),
     bell: crossingActive(), train: train.phase === 'idle' ? null : { dist: Math.abs(tc - 790), speed: (train.v||0) / PX_PER_M, pan: clamp((tc - 790)/900, -1, 1) } });
+  if (now - lastObjets > 5000){ lastObjets = now; objetsTick(); }
   if (now - lastHud > 400){ lastHud = now; hud(w, info); }
   requestAnimationFrame(frame);
 }

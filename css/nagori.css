@@ -126,3 +126,7 @@ button:disabled{opacity:.45;cursor:default}
 .ko-text{margin-top:10px;font-size:13px;line-height:1.55;text-align:left}
 .ko-text .todo{display:block;border:1px dashed var(--line);border-radius:8px;padding:8px 10px;color:var(--muted);font-size:12px}
 @media (max-width:560px){ .season .reading{text-align:left} .ko-text{display:none} }
+
+.etagere .et-liste{display:flex;flex-direction:column;gap:8px;margin:10px 0}
+.etagere .et-ligne{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.etagere button[disabled]{opacity:.45;cursor:default}

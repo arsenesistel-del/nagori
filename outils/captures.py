@@ -29,6 +29,21 @@ ETATS = [
     ('brouillard-aube',  1280, 720, False, '2026-11-18', 6.9,  'fog',       False, None),
 ]
 
+# traces (session 2) : nom, date, heure, météo, neige au sol, trace montrée par l'Atelier, avec trace d'habitude, givre
+TRACES = [
+    ('trace-thermos-tasse',   '2026-11-17', 9.0,  'clear',     False, 'thermos:ecolier',        False, False),
+    ('trace-thermos-givre',   '2026-11-18', 8.0,  'overcast',  False, 'thermos:refroidit',      False, True),
+    ('trace-thermos-habitude', '2026-11-17', 9.0, 'clear',     False, 'thermos:vieille',        True,  False),
+    ('trace-parapluie-vide',  '2026-11-17', 13.0, 'overcast',  False, 'parapluie:ecolier',      False, False),
+    ('trace-parapluie-neige', '2026-11-20', 9.0,  'overcast',  True,  'parapluie:reste',        False, False),
+    ('trace-parapluie-rendu', '2026-11-17', 13.0, 'clear',     False, 'retour:mandarines',      False, False),
+    ('trace-lumiere-chat',    '2026-11-20', 22.0, 'overcast',  False, 'lumiere:chat',           False, False),
+    ('trace-lumiere-givre',   '2026-11-20', 22.0, 'clear',     False, 'lumiere:givre',          False, True),
+    ('trace-pas-botte',       '2026-11-20', 10.0, 'overcast',  True,  'thermos:chasseneige',    False, False),
+    ('trace-pas-renard',      '2026-11-20', 10.0, 'overcast',  True,  'lumiere:renard',         False, False),
+    ('trace-banc-deplace',    '2026-11-20', 10.0, 'overcast',  True,  'lumiere:abri',           False, False),
+]
+
 GRAINE = """
 (() => { let s = 123456789;
   Math.random = () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return ((s >>> 0) / 4294967296); };
@@ -58,6 +73,33 @@ def serveur():
             yield s.server_address[1]
         finally:
             s.shutdown()
+
+
+def prendre_traces(dossier):
+    """Une capture par trace, montrée par l'aperçu de l'Atelier (rien n'est enregistré)."""
+    from playwright.sync_api import sync_playwright
+    dossier = pathlib.Path(dossier); dossier.mkdir(parents=True, exist_ok=True)
+    with serveur() as port, sync_playwright() as p:
+        nav = p.chromium.launch(args=['--no-sandbox'])
+        for nom, date, heure, meteo, sol, trace, hab, givre in TRACES:
+            ctx = nav.new_context(viewport={'width': 1280, 'height': 720}, device_scale_factor=2, service_workers='block')
+            ctx.route('**/*', lambda r: r.continue_() if r.request.url.startswith('http://127.0.0.1') else r.abort())
+            page = ctx.new_page(); erreurs = []
+            page.on('pageerror', lambda e: erreurs.append(str(e)))
+            page.clock.install(time=datetime.datetime(2026, 11, 17, 12, 0, 0, tzinfo=datetime.timezone.utc))
+            page.add_init_script(GRAINE)
+            page.goto(f'http://127.0.0.1:{port}/?atelier')
+            page.clock.run_for(1500)
+            page.evaluate("document.querySelectorAll('[data-close]').forEach(b => b.click())")
+            page.evaluate(REGLER, [date, heure, meteo, sol, None])
+            page.evaluate("([t, h, g]) => { const set = (id, v) => { const e = document.getElementById(id); e.checked = v; e.dispatchEvent(new Event('change', {bubbles: true})); };"
+                          " set('lab-habitude', h); set('lab-givre', g); const s = document.getElementById('lab-trace'); s.value = t; s.dispatchEvent(new Event('change', {bubbles: true})); }", [trace, hab, givre])
+            for _ in range(8): page.clock.run_for(1000)        # 8 s simulées suffisent : les traces ne dépendent pas de la météo qui s'installe
+            page.screenshot(path=str(dossier / f'{nom}.png'), clip={'x': 120, 'y': 270, 'width': 830, 'height': 230})   # la gare et le banc, en double définition
+            print('capture', nom, '(erreurs : %d)' % len(erreurs), flush=True)
+            for e in erreurs[:5]: print('   ', e)
+            ctx.close()
+        nav.close()
 
 
 def prendre(dossier, seul=None):
@@ -109,8 +151,8 @@ def comparer(avant, apres, seuil=12):
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     sp = ap.add_subparsers(dest='cmd', required=True)
-    a = sp.add_parser('prendre'); a.add_argument('dossier'); a.add_argument('--etat')
+    a = sp.add_parser('prendre'); a.add_argument('dossier'); a.add_argument('--etat'); a.add_argument('--traces', action='store_true')
     c = sp.add_parser('comparer'); c.add_argument('avant'); c.add_argument('apres')
     args = ap.parse_args()
-    if args.cmd == 'prendre': prendre(args.dossier, args.etat)
+    if args.cmd == 'prendre': (prendre_traces(args.dossier) if args.traces else prendre(args.dossier, args.etat))
     else: comparer(args.avant, args.apres)

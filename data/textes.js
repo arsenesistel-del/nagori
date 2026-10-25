@@ -61,6 +61,44 @@ NAGORI.TEXTES = {
   lampeBouton: 'Allumer la lampe',
   lampeBoutonJour: 'Lampe (au crépuscule)',
   chatRonronne: 'Le chat ronronne.',
+  /* étagère de la salle d'attente (lot C) : intitulés fonctionnels, provisoires */
+  etagere: {
+    titre: "L'étagère de la salle d'attente",
+    libre: 'Rien n\'est posé.',
+    pose: 'Posé : {objet}.',
+    objets: { thermos: 'Thermos de thé', parapluie: 'Parapluie à prêter', lumiere: 'Lumière laissée allumée' },
+    poser: 'Poser', reprendre: 'Reprendre', fermer: 'Fermer',
+    absent: 'Le parapluie n\'est pas là.',
+    unSeul: 'Un seul objet à la fois.',
+    poseToast: '{objet} : posé.', repriseToast: '{objet} : repris.'
+  },
+  /* ligne affichée au toucher d'une trace (lot D) : emplacements à écrire par Arsène, pas de texte inventé */
+  traces: {
+    'tasse-retournee': '(texte à écrire : la tasse retournée)',
+    'refermé': '(texte à écrire : le thermos refermé avec soin)',
+    'tasse-banc': '(texte à écrire : la tasse au bout du banc)',
+    'couvercle-givre': '(texte à écrire : le couvercle du thermos)',
+    'tasse-rincee': '(texte à écrire : la tasse rincée)',
+    'ouvert-vide': '(texte à écrire : le thermos ouvert et vide)',
+    'vide': '(texte à écrire : le porte-parapluie vide)',
+    'plein': '(texte à écrire : le parapluie resté là)',
+    'plein-neige': '(texte à écrire : le parapluie sous la neige)',
+    'plie-seche': '(texte à écrire : le parapluie rendu, plié et sec)',
+    'mot-tableau': '(texte à écrire : un mot au tableau)',
+    'mandarines': '(texte à écrire : un petit sac de mandarines)',
+    'ticket': '(texte à écrire : un ticket d\'une autre ligne)',
+    'chat-vitre': '(texte à écrire : le chat derrière la vitre)',
+    'banc-deplace': '(texte à écrire : le banc déplacé)',
+    'givre-vitre': '(texte à écrire : le givre sur la vitre)',
+    'renard': '(texte à écrire : des poils roux)',
+    'gresille': '(texte à écrire : la lumière qui grésille)',
+    'pas-ecolier': '(texte à écrire : les pas de l\'écolier)',
+    'pas-botte': '(texte à écrire : des traces de bottes)',
+    'pas-botte-porte': '(texte à écrire : des traces de bottes vers la porte)',
+    'pas-renard': '(texte à écrire : des traces de renard)',
+    'habitude': '(texte à écrire : la trace particulière d\'un habitué)',
+    'givre-banc': '(texte à écrire : le givre sur le banc et les rails)'
+  },
   objetRange: 'Tu as rangé {objet} aux objets trouvés.',
 
   /* registre */
