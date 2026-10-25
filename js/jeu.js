@@ -993,12 +993,14 @@ function sceneHit(ev){
   const info = computeInfo(worldTime());
   if (info.cat){ const [cx,cy] = CAT_POS[info.cat]; if (Math.abs(x-cx) < 26 && Math.abs(y-cy+8) < 22) return 'cat'; }
   if (info.item && x > 800 && x < 856 && y > 625 && y < 690) return 'item';
+  { const e = etatObjets();
+    if (x > 770 && x < 796 && y > 636 && y < 664){ if (e.tr && e.tr.type === 'thermos') return 'trace:' + e.tr.visuel; if (e.pose === 'thermos') return 'etagere'; }
+  }
   if (info.waiting && trav.state==='none' && x > 736 && x < 790 && y > 600 && y < 686) return 'traveler';
   { const e = etatObjets();
     if (x > 546 && x < 596 && y > 618 && y < 636) return 'etagere';
     if (x > 546 && x < 596 && y > 596 && y < 618 && e.tr && e.tr.type === 'lumiere') return 'trace:' + e.tr.visuel;
     if (x > 522 && x < 552 && y > 640 && y < 684){ if (e.retour) return 'trace:' + (e.retour.trace || 'plie-seche'); if (e.tr && e.tr.type === 'parapluie') return 'trace:' + (e.tr.visuel === 'plein' && e.tr.contexte && e.tr.contexte.neige ? 'plein-neige' : e.tr.visuel); if (e.pose === 'parapluie') return 'etagere'; }
-    if (x > 738 && x < 832 && y > 628 && y < 664){ if (e.tr && e.tr.type === 'thermos') return 'trace:' + e.tr.visuel; if (e.pose === 'thermos') return 'etagere'; }
     if (e.tr && e.tr.visuel === 'renard' && x > 484 && x < 500 && y > 676 && y < 688) return 'trace:renard';
     if (e.tr && e.tr.visuel === 'banc-deplace' && x > 750 && x < 848 && y > 636 && y < 664) return 'trace:banc-deplace';
     if (x > 376 && x < 424 && y > 646 && y < 674 && e.retour && e.retour.trace === 'mot-tableau') return 'trace:mot-tableau';

@@ -59,11 +59,11 @@ class Banc:
         return r.abort()
 
     def avancer(self, secondes):
+        self.ecoule += secondes                 # avant le saut : la réponse simulée doit déjà être à la nouvelle heure
         if secondes <= 12: self.page.clock.run_for(int(secondes * 1000))
         else:
             self.page.clock.fast_forward(int(secondes * 1000))
             self.page.wait_for_timeout(250)
-        self.ecoule += secondes
         self.page.wait_for_timeout(200)
         self.page.clock.run_for(1000)
         self.page.wait_for_timeout(200)
@@ -117,7 +117,7 @@ with captures.serveur() as port, sync_playwright() as p:
     ok(json.dumps(b.save()['objets'], sort_keys=True) == avant, 'recharger la page ne change rien')
     sauve = json.dumps(b.save())
     ok('"kind"' not in sauve and 'snowDepth' not in sauve and 'simulee' not in sauve, 'sauvegarde : aucune donnée météo')
-    b.clic_scene(804, 650)
+    b.clic_scene(782, 650)
     toast = b.page.inner_text('#toast')
     ok('texte à écrire' in toast or o['trace']['visuel'] in ('ouvert-vide',), f'toucher la trace : ligne provisoire « {toast} »')
     ok(not b.erreurs, 'aucune erreur' + (f' ({b.erreurs})' if b.erreurs else ''))
@@ -133,12 +133,12 @@ with captures.serveur() as port, sync_playwright() as p:
     b.avancer(25 * 3600); b.avancer(10)
     o = b.save()['objets']
     ok(o['pose'] is not None and o['trace'] is None, 'après 25 h sans météo : on attend')
-    b.avancer(47 * 3600); b.avancer(10)
+    b.avancer(46 * 3600); b.avancer(10)
     o = b.save()['objets']
-    ok(o['pose'] is not None, 'après 72 h : on attend encore (48 h après la fin de la fenêtre)')
+    ok(o['pose'] is not None, 'après 71 h : on attend encore (48 h après la fin de la fenêtre)')
     b.avancer(2 * 3600); b.avancer(10)
     o = b.save()['objets']
-    ok(o['pose'] is None and o['trace'] and o['trace']['id'] != 'chasseneige', f'après 74 h : résolu sans météo ({o["trace"] and o["trace"]["id"]})')
+    ok(o['pose'] is None and o['trace'] and o['trace']['id'] != 'chasseneige', f'après 73 h : résolu sans météo ({o["trace"] and o["trace"]["id"]})')
     b.fin()
 
     print('aperçu de l\'Atelier : rien n\'est enregistré')
