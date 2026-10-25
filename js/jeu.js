@@ -919,7 +919,7 @@ $('#lab-traveler').addEventListener('click', () => {
 $('#lab-away').addEventListener('click', () => { openRegistre(Date.now() - 15*36e5); });
 $('#lab-gifts').addEventListener('click', () => { save.preview = !save.preview; persist(); toast(save.preview ? 'Aperçu : la gare avec six omiyage.' : 'Aperçu retiré.'); });
 $('#lab-reset').addEventListener('click', () => { save = fresh(); save.lastVisit = Date.now(); persist(); bookSig = ''; renderBook(-1); $('#traveler').hidden = true; toast('Tout est remis à zéro.'); });
-$('#lab-place').textContent = `Gare placée provisoirement à ${STATION.lat}° N, ${STATION.lon}° E : ${STATION.place}. Arrêts à ${TRAINS.filter(t=>t.stop).map(t=>hhmm(t.h+t.m/60)).join(', ')} ; trains sans arrêt à ${TRAINS.filter(t=>!t.stop).map(t=>hhmm(t.h+t.m/60)).join(', ')}.`;
+$('#lab-place').textContent = `Gare placée à ${STATION.lat}° N, ${STATION.lon}° E : ${STATION.place}. Arrêts à ${TRAINS.filter(t=>t.stop).map(t=>hhmm(t.h+t.m/60)).join(', ')} ; trains sans arrêt à ${TRAINS.filter(t=>!t.stop).map(t=>hhmm(t.h+t.m/60)).join(', ')}.`;
 { const n = tokyoAt(Date.now()); labDate.value = dayKey(n.y,n.m,n.d); }
 { const n = tokyoAt(Date.now()), list = CIEL.nextKo(Date.now(), 4); $('#lab-cal').textContent = 'Prochains kō : ' + list.map(s => `${KO[s.k][0]} le ${frDate(s.date.y,s.date.m,s.date.d)}`).join(' · '); }
 

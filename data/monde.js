@@ -2,8 +2,11 @@
    Tout ce qui décrit la gare et sa vie, sans texte narratif. Les heures sont celles de Tokyo (JST). */
 window.NAGORI = window.NAGORI || {};
 
-/* La gare. Région provisoire (bible : à trancher). */
-NAGORI.STATION = { lat: 42.55, lon: 140.67, region: 'Hokkaidō', place: 'Hokkaidō, ligne Muroran (provisoire)' };
+/* La gare. Région décidée le 26 octobre 2026 : la vallée du haut Yubetsu, à Engaru (Hokkaidō), sur la ligne Sekihoku.
+   Le point est celui de la vraie gare de Shirataki (Wikipédia : 43,8842 N, 143,1809 E ; le géocodeur Open-Meteo place le village à 400 m).
+   Le ciel (soleil, lever et coucher) et la météo sont calculés ici ; la gare de Nagori, ses horaires et ses habitants restent imaginaires.
+   Soleil le 17 novembre : lever 06:24, coucher 16:01. Modèle météo : maille de 43,90 N, 143,18 E, altitude du point 370 m. */
+NAGORI.STATION = { lat: 43.8842, lon: 143.1809, region: 'Hokkaidō', place: 'Hokkaidō, vallée du haut Yubetsu (Engaru), ligne Sekihoku, au point de la gare de Shirataki' };
 
 /* Trains de la journée. stop : s'arrête en gare. */
 NAGORI.TRAINS = [

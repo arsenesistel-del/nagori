@@ -147,11 +147,19 @@ test('point de vue : un instant et une météo ; simulé dès que l\'un des deux
   assert.equal(M.pointDeVue({ simulated: false }, M.simulee(reel, { kind: 'rain' })).simule, true);
 });
 
+/* ---------- Lieu ---------- */
+test('lieu : la gare est au point de la gare de Shirataki, et le jeu et les tests utilisent le même', () => {
+  const ctx = {}; ctx.window = ctx; require('vm').runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'data', 'monde.js'), 'utf8'), ctx);
+  const S = ctx.window.NAGORI.STATION;
+  assert.equal(S.lat, 43.8842); assert.equal(S.lon, 143.1809);
+  assert.match(M.adresse(S.lat, S.lon, 1), /latitude=43\.8842&longitude=143\.1809/);
+});
+
 /* ---------- Requête, panne, reprises ---------- */
 test('requête : adresse, jours passés, délais de reprise', () => {
-  const u = M.adresse(43.866, 143.1609, 3);
+  const u = M.adresse(43.8842, 143.1809, 3);
   for (const v of M.VARIABLES) assert.ok(u.includes(v), v);
-  assert.ok(u.includes('past_days=3') && u.includes('timezone=Asia%2FTokyo') && u.includes('latitude=43.866'));
+  assert.ok(u.includes('past_days=3') && u.includes('timezone=Asia%2FTokyo') && u.includes('latitude=43.8842'));
   const t = Date.UTC(2026, 10, 20);
   assert.equal(M.joursPasses(null, t), 1); assert.equal(M.joursPasses(t - 2 * H, t), 2);
   assert.equal(M.joursPasses(t - 3 * 24 * H, t), 4); assert.equal(M.joursPasses(t - 60 * 24 * H, t), 8);
@@ -180,7 +188,7 @@ const reponse = (status, corps) => ({ ok: status >= 200 && status < 300, status,
 async function essai(scenario) {
   const w = monde(), mg = M.creerMagasin();
   const horaires = [];
-  const c = M.creerClient({ magasin: mg, lat: 43.866, lon: 143.1609, jours: 2, maintenant: w.maintenant, planifier: w.planifier, annuler: w.annuler,
+  const c = M.creerClient({ magasin: mg, lat: 43.8842, lon: 143.1809, jours: 2, maintenant: w.maintenant, planifier: w.planifier, annuler: w.annuler,
     fetch: (u, o) => { horaires.push(Math.round((w.t - CAPTURE) / MIN)); return scenario(u, o, w); } });
   return { w, mg, c, horaires };
 }

@@ -50,7 +50,7 @@ Tester en local : `python3 -m http.server` dans le dossier, puis ouvrir `http://
 
 Prototype de 14 jours (cahier des charges v3 dans le projet claude.ai) : six sessions de code. Avant chaque session, étiquette git `avant-session-N` et captures de référence ; après, tests, mise à jour de ce fichier, compte rendu. Session 1 faite (lots A et B : météo honnête, point de vue, sauvegarde v3, tests, captures), sur la branche `session-1`, étiquette `avant-session-1` sur `main`. Reste à faire : session 2 (objets et traces), puis 3 à 6.
 
-Région : la gare est toujours placée à 42,55° N, 140,67° E (Koboro, baie d'Uchiura). Le cahier des charges propose la vallée du haut Yubetsu (Shirataki, Engaru) ; le changement tient dans `NAGORI.STATION` (`data/monde.js`) et n'est pas appliqué tant qu'Arsène n'a pas donné son accord.
+Région (décidée le 26 octobre 2026) : la vallée du haut Yubetsu, à Engaru (Hokkaidō), sur la ligne Sekihoku, au point de la vraie gare de Shirataki : 43,8842° N, 143,1809° E (Wikipédia ; le géocodeur Open-Meteo place le village à 400 m). Tout vient de `NAGORI.STATION` (`data/monde.js`) : soleil, météo, Atelier. Soleil le 17 novembre : 06:24 à 16:01. La gare de Nagori, ses horaires et ses habitants restent imaginaires. Le test de météo réelle `tests/donnees/reel-2026-10-22.json` a été pris 2,6 km plus au sud-ouest, dans la même maille du modèle, donc la même météo.
 
 Le terminal de l'espace de travail n'atteint pas Open-Meteo : géocodage et séries réelles passent par le navigateur intégré (`mcp__remote-devices__Claude_Browser__*`) ; le Chrome relié n'a pas répondu en session 1.
 
