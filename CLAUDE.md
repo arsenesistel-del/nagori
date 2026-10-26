@@ -4,6 +4,13 @@ Petit jeu web contemplatif : une gare de campagne japonaise qui vit à l'heure r
 
 Les documents de référence (bible du projet, boucle de jeu et plan) sont dans le projet claude.ai « Nagori · jeu des micro-saisons ». En cas de doute sur une décision de design, ils font foi.
 
+## Reprendre le travail (nouvelle conversation)
+
+1. Lire ce fichier, `PASSATION.md` (décisions récentes, prochaine action), puis le cahier des charges v3 du projet claude.ai pour les lots concernés. La bible fait référence pour le design ; ne pas la modifier.
+2. Vérifier l'état réel : `git status`, `git branch`, `git log --oneline | head`. Branche de travail : `session-1`. Ne rien fusionner dans `main` ni déployer sans accord explicite d'Arsène.
+3. Ne pas refaire les analyses ni rediscuter les décisions validées (listées dans `PASSATION.md`) sans raison concrète.
+4. Début de session : étiquette `avant-session-N`, captures de référence. Fin : tests (voir `PASSATION.md`), mise à jour de ce fichier, compte rendu court, commit et push de la branche.
+
 ## État actuel
 
 Version de travail vers la « version jouable » (voir la feuille de route dans le projet claude.ai). Site statique, sans dépendance ni étape de build, hébergé sur GitHub Pages depuis `main`, à la racine.
@@ -68,4 +75,4 @@ Direction : 2D en couches (choix du 18 octobre 2026), pour pouvoir accueillir pl
 
 ## Pistes ouvertes
 
-Région réelle de la gare, nom définitif, qui sont les voyageurs, chef de gare visible ou non, présence des autres joueurs, musique, langues. Voir la bible.
+Nom définitif, qui sont les voyageurs, chef de gare visible ou non, présence des autres joueurs, musique, langues. Voir la bible.
