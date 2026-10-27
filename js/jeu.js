@@ -13,6 +13,12 @@ const RANK = {'Peu commun':1,'Rare':2,'Légendaire':3};
 const WX_LABEL = T.meteo;
 const OBJ = N.objets, POSES = N.POSES;   /* js/objets.js, data/objets.js : les trois objets à laisser */
 const MET = N.meteo;                 /* js/meteo.js : sources de la météo, panne, point de vue */
+/* session 3 (lots F, G, H) : js/vie.js, data/habitues.js. Traits et textes provisoires : visibles seulement avec ?atelier,
+   tant qu'Arsène ne les a pas validés ; la case « provisoire » de l'Atelier les coupe pour revoir le jeu tel qu'il est. */
+const VIE = N.vie, HAB = N.HABITUES, NUIT = N.NUIT, FERM = N.FERMETURE, RG = HAB.regles, TP = T.provisoire;
+const AVEC_ATELIER = new URLSearchParams(location.search).has('atelier');
+let provOn = AVEC_ATELIER;
+const prov = () => provOn;
 /* remplace {mot} par sa valeur */
 const tx = (str, vars = {}) => String(str).replace(/\{(\w+)\}/g, (_, k) => vars[k] != null ? vars[k] : '');
 const koName = k => `${KO[k][0]} (${KO[k][2]})`;
@@ -63,7 +69,6 @@ function worldTime(){
 }
 const dayKey = (y,m,d) => `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 function addDays(y,m,d,n){ const t = new Date(Date.UTC(y,m-1,d+n)); return {y:t.getUTCFullYear(), m:t.getUTCMonth()+1, d:t.getUTCDate()}; }
-const weekday = (y,m,d) => new Date(Date.UTC(y,m-1,d)).getUTCDay();
 const idx = (y,m,d,h) => Date.UTC(y,m-1,d)/6e4 + h*60;
 const jstMs = (y,m,d,h) => Date.UTC(y,m-1,d) + (h-9)*3600e3;
 const SEASONS = {};
@@ -93,24 +98,37 @@ function dayPlan(y,m,d){
 
 /* ---------- Habitués : position en fonction de l'heure ---------- */
 const lerp = (a,b,t) => a+(b-a)*t;
+/* jour d'école : du lundi au vendredi, sauf jours fériés japonais (data/objets.js, les mêmes que pour les objets) */
+const jourDecole = (y,m,d) => OBJ.jourDecole(POSES, jstMs(y,m,d,12));
 function habitues(w){
-  const out = [], h = w.hour, wd = weekday(w.y,w.m,w.d), school = wd>=1 && wd<=5;
+  const out = [], h = w.hour, school = jourDecole(w.y,w.m,w.d);
+  /* traits provisoires (lot G) : selon la météo dessinée */
+  const p = prov(), m = vue.meteo, pluie = p && VIE.parapluie(RG, m), bonnet = p && VIE.bonnet(RG, m);
   if (school){
-    if (h >= 7.5 && h < 7.8){ const t = clamp((h-7.5)/0.06,0,1); out.push({kind:'kid', x:lerp(1260,940,t), walk:t<1, sit:false}); }
-    if (h >= 16.36 && h < 16.46){ const t = (h-16.36)/0.1; out.push({kind:'kid', x:lerp(900,1280,t), walk:true, sit:false, face:1}); }
+    if (h >= 7.5 && h < 7.8){ const t = clamp((h-7.5)/0.06,0,1); out.push({kind:'kid', x:lerp(1260,940,t), walk:t<1, sit:false, umbrella:pluie, hat:bonnet}); }
+    if (h >= 16.36 && h < 16.46){ const t = (h-16.36)/0.1; out.push({kind:'kid', x:lerp(900,1280,t), walk:true, sit:false, face:1, umbrella:pluie, hat:bonnet}); }
   }
-  if (h >= 13 && h < 13.6){ const t = clamp((h-13)/0.06,0,1); out.push({kind:'lady', x:lerp(520,792,t), walk:t<1, sit:t>=1}); }
-  else if (h >= 13.6 && h < 13.68){ const t = (h-13.6)/0.08; out.push({kind:'lady', x:lerp(792,500,t), walk:true, sit:false, fade: h>13.65 ? 1-(h-13.65)/0.03 : 1}); }
-  for (const [a,b] of [[10.4,10.9],[21.4,21.9]]) if (h >= a && h < b){ out.push({kind:'worker', x:lerp(1500,100,(h-a)/(b-a)), walk:true, lantern: a > 20}); }
+  if (!p || VIE.vieilleVient(RG, m)){
+    if (h >= 13 && h < 13.6){ const t = clamp((h-13)/0.06,0,1); out.push({kind:'lady', x:lerp(520,792,t), walk:t<1, sit:t>=1, umbrella:pluie && t<1}); }
+    else if (h >= 13.6 && h < 13.68){ const t = (h-13.6)/0.08; out.push({kind:'lady', x:lerp(792,500,t), walk:true, sit:false, fade: h>13.65 ? 1-(h-13.65)/0.03 : 1, umbrella:pluie}); }
+  }
+  /* le cheminot : après une nuit de neige, il s'arrête déblayer le passage à niveau (trait provisoire) */
+  const D = RG.cheminotDeneige;
+  if (p && VIE.cheminotDeneige(RG, m) && h >= D.de && h < D.a){
+    const t = (h - D.de)/(D.a - D.de), x = t < .2 ? lerp(1500, D.arret, t/.2) : t < .65 ? D.arret : lerp(D.arret, 100, (t-.65)/.35);
+    out.push({kind:'worker', x, walk: t < .2 || t >= .65, shovel: t >= .2 && t < .65, face: t >= .2 && t < .65 ? 1 : 0});
+  }
+  else for (const [a,b] of [[10.4,10.9],[21.4,21.9]]) if (h >= a && h < b){ out.push({kind:'worker', x:lerp(1500,100,(h-a)/(b-a)), walk:true, lantern: a > 20}); }
   return out;
 }
 function catSpot(w){
   const today = dayKey(w.y,w.m,w.d);
   if (save.fed === today && w.hour >= save.fedHour && w.hour < save.fedHour + 0.75) return 'bowl';
-  for (const c of dayPlan(w.y,w.m,w.d).cat) if (w.hour >= c.from && w.hour < c.to) return c.spot;
+  for (const c of dayPlan(w.y,w.m,w.d).cat) if (w.hour >= c.from && w.hour < c.to) return prov() && VIE.chatAbrite(RG, vue.meteo) ? 'salle' : c.spot;
   return null;
 }
-const CAT_POS = { roof:[470,540], bench:[812,662], bowl:[668,682] };
+/* salle : sur le rebord de la fenêtre de gauche, près du poêle (trait provisoire) */
+const CAT_POS = { roof:[470,540], bench:[812,662], bowl:[668,682], salle:[402,630] };
 
 /* ---------- Couleurs ---------- */
 const mix = (a,b,t) => [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t];
@@ -201,8 +219,11 @@ function tempNow(){ const t = vue.meteo.temp; return t != null ? Math.round(t) :
 function drawScene(w, info){
   const {e} = info.sun;
   const Lraw = clamp((e+.25)/.6, 0, 1);
-  const L = (0.2 + 0.8*Lraw) * (1 - .25*wx.cloud);
+  let L = (0.2 + 0.8*Lraw) * (1 - .25*wx.cloud);
   const night = 1 - Lraw;
+  /* clair de lune (provisoire, lot F) : la vraie lune, levée, éclaire un peu la nuit, davantage sur la neige */
+  const lune = info.lune, luneHaute = lune ? clamp(lune.elev/20, 0, 1) * lune.lit * (1-wx.cloud) : 0;
+  if (lune) L = Math.min(1, L + .1*luneHaute*night*(1 + .6*snowCover));
   let [top, bot] = skyAt(e);
   const grey = mix([22,28,40],[150,158,168], Lraw);
   top = mix(top, mix(grey,[0,0,0],.08), wx.cloud*.78); bot = mix(bot, grey, wx.cloud*.7);
@@ -211,7 +232,7 @@ function drawScene(w, info){
   const wind = windNow(), temp = tempNow();
   const now = performance.now(), dt = Math.min(.1, (now - (lastFx||now))/1000); lastFx = now;
   weatherCover(dt);
-  info.L = L; info.night = night; info.snowy = snowy;
+  info.L = L; info.night = night; info.snowy = snowy; curFerm = info.ferm;
 
   /* ---- ciel (écran) */
   ctx.setTransform(DPR,0,0,DPR,0,0);
@@ -219,7 +240,7 @@ function drawScene(w, info){
   let g = ctx.createLinearGradient(0,0,0,Math.max(10,horizonY));
   g.addColorStop(0, rgb(top)); g.addColorStop(1, rgb(bot));
   ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
-  const starA = clamp(-e*1.6,0,1) * (1-wx.cloud);
+  const starA = clamp(-e*1.6,0,1) * (1-wx.cloud) * (1 - .55*luneHaute);
   if (starA > .01){ for (const s of STARS){ ctx.fillStyle = `rgba(240,238,225,${starA*(.55+.45*Math.sin(clock*1.3+s.tw))})`; ctx.beginPath(); ctx.arc(s.x*W, s.y*horizonY, s.r, 0, 7); ctx.fill(); } }
   if (info.sun.t != null && wx.cloud < .85){
     const sx = W*(.12+.76*info.sun.t), sy = horizonY - Math.max(0,e)*horizonY*.82;
@@ -227,10 +248,18 @@ function drawScene(w, info){
     sg.addColorStop(0,`rgba(255,240,205,${.9*(1-wx.cloud)})`); sg.addColorStop(.12,`rgba(255,228,180,${.5*(1-wx.cloud)})`); sg.addColorStop(1,'rgba(255,220,170,0)');
     ctx.fillStyle = sg; ctx.fillRect(sx-260,sy-260,520,520);
   }
-  const moonA = clamp(-e*2,0,1) * (1-wx.cloud*.9);
-  const mx = W*.78, my = Math.max(70, horizonY*.3);
-  if (moonA > .02){
-    const p = info.moon, k = (1-Math.cos(2*Math.PI*p))/2, s = p < .5 ? 1 : -1, r = 14 + 8*S;
+  let moonA = clamp(-e*2,0,1) * (1-wx.cloud*.9);
+  let mx = W*.78, my = Math.max(70, horizonY*.3), mPhase = info.moon;
+  if (lune){                     // la vraie lune : sa direction et sa hauteur, comme le soleil (est à gauche)
+    const t = (lune.az-90)/180;
+    moonA *= lune.elev > 0 && t > -.08 && t < 1.08 ? clamp(lune.elev/4, 0, 1) : 0;
+    /* à l'horizon, la lune se lève derrière les montagnes ; dès une quinzaine de degrés, elle passe au-dessus des crêtes */
+    mx = W*(.12+.76*clamp(t, 0, 1)); my = horizonY - (horizonY - 60)*Math.pow(Math.sin(Math.max(0, lune.elev)*Math.PI/180), .5); mPhase = lune.phase;
+  }
+  /* les crêtes réelles ne dépassent pas une quinzaine de degrés : au-dessus, la vraie lune se dessine devant les montagnes du décor */
+  const luneDevant = lune && lune.elev >= 15;
+  const dessinLune = () => { if (moonA <= .02) return;
+    const p = mPhase, k = (1-Math.cos(2*Math.PI*p))/2, s = p < .5 ? 1 : -1, r = 14 + 8*S;
     const mg = ctx.createRadialGradient(mx,my,0,mx,my,r*6); mg.addColorStop(0,`rgba(240,236,214,${.25*moonA*k})`); mg.addColorStop(1,'rgba(240,236,214,0)');
     ctx.fillStyle = mg; ctx.fillRect(mx-r*6,my-r*6,r*12,r*12);
     ctx.fillStyle = `rgba(200,205,220,${.08*moonA})`; ctx.beginPath(); ctx.arc(mx,my,r,0,7); ctx.fill();
@@ -238,7 +267,8 @@ function drawScene(w, info){
     for (let a=-Math.PI/2; a<=Math.PI/2+.001; a+=Math.PI/40) ctx.lineTo(mx + s*r*Math.cos(a), my + r*Math.sin(a));
     for (let a=Math.PI/2; a>=-Math.PI/2-.001; a-=Math.PI/40) ctx.lineTo(mx + s*r*Math.cos(a)*(1-2*k), my + r*Math.sin(a));
     ctx.fill();
-  }
+  };
+  if (!luneDevant) dessinLune();
   const cloudA = clamp(wx.cloud*1.1-.05,0,1);
   if (cloudA > .02){
     const cc = mix(bot, [255,255,255], .15+.4*Lraw);
@@ -258,6 +288,7 @@ function drawScene(w, info){
     ctx.fillStyle = rgb(c); ctx.fill();
     if (capAmt > .05){ ctx.save(); ctx.clip(); ctx.fillStyle = rgb(shade(C.snow,.35+.65*L), capAmt*(base===520 ? .85 : .5)); ctx.fillRect(-300,0,2200, base===520 ? base-112 : base-40); ctx.restore(); }
   }
+  if (luneDevant){ ctx.setTransform(DPR,0,0,DPR,0,0); dessinLune(); ctx.setTransform(DPR*S,0,0,DPR*S,DPR*OX,DPR*OY); }
   const haze = ctx.createLinearGradient(0,430,0,560); haze.addColorStop(0,rgb(bot,0)); haze.addColorStop(1,rgb(bot,.45+.3*wx.fog)); ctx.fillStyle = haze; ctx.fillRect(-300,430,2200,130);
   // rivière
   g = ctx.createLinearGradient(0,548,0,648); g.addColorStop(0, rgb(mix(bot,[10,16,30],.35))); g.addColorStop(1, rgb(mix(top,[6,10,22],.55)));
@@ -284,6 +315,8 @@ function drawScene(w, info){
   ctx.fillStyle = col(C.rail, .3+.7*L); ctx.fillRect(-300,651,2200,3); ctx.fillRect(-300,661,2200,3);
   if (wetness > .2 || snowy) { ctx.fillStyle = `rgba(230,236,246,${.25*Math.max(wetness, snowCover)*(.3+.7*L)})`; ctx.fillRect(-300,651,2200,1); ctx.fillRect(-300,661,2200,1); }
   for (const p of info.people) if (p.kind==='worker') figure(p, 652, L, night);
+  const visiteur = visiteurMaintenant(w);
+  if (visiteur && visiteur.id === 'cerf') drawVisiteur(visiteur, L, night);
   drawTrain(L, night, snowy);
   drawCrossing(L, night, crossingActive(), snowy);
 
@@ -301,6 +334,7 @@ function drawScene(w, info){
     ctx.fillStyle = col([200,206,216], .35+.65*L, .5); ctx.fillRect(470, 678, 330, 6);
   }
   drawEmpreintes(L, snowy);
+  drawPistes(L, w);
   drawReflections(L, night, info);
   drawDebris(L, season, info);
   drawMailbox(L, snowy);
@@ -317,6 +351,8 @@ function drawScene(w, info){
   if (info.cat && info.cat !== 'roof') drawCat(info.cat, L, night);
   if (info.waiting && trav.state === 'none') figure({kind:'traveler', x:760, sit:true}, 682, L, night);
   for (const p of info.people) if (p.kind!=='worker') figure(p, 682, L, night);
+  if (visiteur && visiteur.id === 'renard') drawVisiteur(visiteur, L, night);
+  drawPapillons(info);
   if (trav.state !== 'none') figure({kind:'traveler', x:trav.x, walk:true, phase:trav.walk, fade:trav.alpha}, 682, L, night);
 
   /* ---- premier plan */
@@ -435,7 +471,7 @@ function hasGift(i){ return save.preview || Object.values(save.gifts).includes(i
 function drawStation(L, night, snowy, info, temp, wind){
   const x0 = 360, x1 = 610, base = 680, top = 584, k = .2+.8*L, lit = night > .3;
   /* la salle d'attente reste éclairée toute la nuit ; le poêle ne chauffe qu'aux heures des trains */
-  const hour = cur.hour, open = true, stove = temp < 10 && hour >= 5.5 && hour < 22.5;
+  const F = info.ferm, hour = cur.hour, open = !(F && F.fermee), stove = open && temp < 10 && hour >= 5.5 && hour < 22.5;
   // murs : planches en bas, enduit et colombages en haut
   ctx.fillStyle = col(C.plaster, k); ctx.fillRect(x0, top, x1-x0, base-top);
   ctx.fillStyle = col(C.wood, k); ctx.fillRect(x0, top+58, x1-x0, base-top-58);
@@ -460,9 +496,21 @@ function drawStation(L, night, snowy, info, temp, wind){
   ctx.fillStyle = col([30,30,34], Math.max(k, lit ? .6 : 0)); ctx.textAlign = 'center'; ctx.font = '700 9px "Shippori Mincho", serif'; ctx.fillText('名残駅', dx0+dw/2, top+7.5); ctx.textAlign = 'left';
   // tableau à craie (伝言板) et horaires
   ctx.fillStyle = col([40,64,52], k); ctx.fillRect(x0+18, top+62, 40, 26);
-  ctx.strokeStyle = col([200,206,196], k, .5); ctx.lineWidth = .8; ctx.beginPath(); ctx.moveTo(x0+22, top+70); ctx.lineTo(x0+44, top+69); ctx.moveTo(x0+22, top+78); ctx.lineTo(x0+36, top+78); ctx.stroke();
   ctx.fillStyle = col([238,236,228], k); ctx.fillRect(x1-56, top+62, 30, 34);
   ctx.fillStyle = col([60,60,70], k); for (let i=0;i<7;i++) ctx.fillRect(x1-52, top+67+i*4, 10 + (i*7%12), 1.2);
+  /* fermeture (provisoire, lot H) : l'avis de fermeture entre la porte et la fenêtre, le compte à rebours à la craie */
+  if (F && F.affiche){
+    const ax = dx0+dw+4, ay = top+12;
+    ctx.fillStyle = col([246,244,236], k); ctx.fillRect(ax, ay, 22, 30);
+    ctx.fillStyle = col([186,44,40], k); ctx.fillRect(ax+2, ay+2, 18, 4);
+    ctx.fillStyle = col([80,80,90], k); for (let i=0;i<5;i++) ctx.fillRect(ax+3, ay+10+i*4, 14 - (i*5%7), 1);
+  }
+  if (F && F.compte != null){
+    ctx.fillStyle = col([232,236,226], k, .9); ctx.textAlign = 'center'; ctx.font = '500 8px "Zen Kaku Gothic New", sans-serif';
+    ctx.fillText(tx(TP.ardoise, {n: F.compte}), x0+38, top+79); ctx.textAlign = 'left';
+  } else {
+    ctx.strokeStyle = col([200,206,196], k, .5); ctx.lineWidth = .8; ctx.beginPath(); ctx.moveTo(x0+22, top+70); ctx.lineTo(x0+44, top+69); ctx.moveTo(x0+22, top+78); ctx.lineTo(x0+36, top+78); ctx.stroke();
+  }
   // toit de tôle, gouttière, cheminée
   const rc = C.roof;
   ctx.fillStyle = col(rc, k);
@@ -502,7 +550,7 @@ function drawVending(L, night, snowy){
   const DR = [[200,60,50],[60,120,190],[230,180,60],[80,150,90],[240,240,240],[150,90,60]];
   for (let r=0;r<3;r++) for (let c=0;c<5;c++){ ctx.fillStyle = col(DR[(r*5+c)%6], k); ctx.fillRect(x+5+c*5, y+7+r*11, 3, 8); }
   ctx.fillStyle = col([30,34,40], k); ctx.fillRect(x+6, y+56, w-12, 10); ctx.fillRect(x+w-9, y+42, 4, 8);
-  const on = night > .2;
+  const on = night > .2 && !(curFerm && curFerm.fermee);
   if (on){ ctx.fillStyle = `rgba(220,240,255,${.45*night})`; ctx.fillRect(x+3, y+4, w-6, 34); glow(x+w/2, y+30, 90, '200,232,250', .3*night); glow(x+w/2, 684, 70, '200,232,250', .2*night); }
   if (snowy){ ctx.fillStyle = col(C.snow, .42+.58*L); ctx.beginPath(); ctx.ellipse(x+w/2, y, w/2+3, 3+snowCover*3, 0, Math.PI, 0); ctx.fill(); }
 }
@@ -683,6 +731,87 @@ function drawEmpreintes(L, snowy){
   }
 }
 
+/* ---------- Session 3 (provisoire) : pas des habitués et des bêtes dans la neige, visiteurs de la nuit ----------
+   Les pas ne restent que s'il y avait de la neige réelle au sol au moment du passage, et s'effacent avec la neige tombée depuis
+   (OBJ.empreinte, comme les traces des objets). Avec une météo simulée par l'Atelier, ils se montrent dès que la neige couvre le quai. */
+let apercuVisiteur = null;
+function etatPas(quandMs, w){
+  if (vue.meteo.source === 'simulee') return snowCover > .25 ? 'net' : null;
+  const e = OBJ.empreinte(magasin, quandMs, jstMs(w.y,w.m,w.d,w.hour)).etat;
+  return e === 'net' || e === 'estompe' ? e : null;
+}
+/* chaque piste : [début, fin, y, taille, pas, forme, quand (heure du jour), qui] */
+function pistesDuJour(w){
+  if (!prov() || snowCover < .25) return [];
+  const out = [], h = w.hour;
+  if (jourDecole(w.y,w.m,w.d)){
+    if (h >= 16.46) out.push([900, 1280, 685, 3, 9, 'chaussure', 16.36, 'ecolier']);
+    else if (h >= 7.8) out.push([1260, 940, 685, 3, 9, 'chaussure', 7.5, 'ecolier']);
+  }
+  const banc = dayPlan(w.y,w.m,w.d).cat.find(c => c.spot === 'bench' && c.from <= h);
+  if (banc && !VIE.chatAbrite(RG, vue.meteo)) out.push([1190, 822, 676, 1.5, 7, 'patte', banc.from, 'chat']);
+  const v = VIE.dernierPassage(NUIT, w.y,w.m,w.d,h);
+  if (v) out.push(v.id === 'cerf' ? [150, 1500, 647, 2, 16, 'sabot', v.debut, 'cerf'] : [1250, 200, 684, 2, 12, 'patte', v.debut, 'renard']);
+  return out.map(p => ({ p, etat: etatPas(jstMs(w.y,w.m,w.d,p[6]), w) })).filter(x => x.etat);
+}
+function drawPistes(L, w){
+  for (const { p, etat } of pistesDuJour(w)){
+    const [a, b, y, taille, pas, forme] = p, dir = b > a ? 1 : -1, x0 = Math.min(a, b), x1 = Math.max(a, b);
+    ctx.fillStyle = col([128,140,168], .35+.65*L, etat === 'net' ? .75 : .3);
+    let i = 0;
+    for (let x = x0; x <= x1; x += pas, i++){
+      const yy = y + (i % 2 ? 1.6 : -.8);
+      if (forme === 'chaussure'){ ctx.beginPath(); ctx.ellipse(x, yy, taille, taille*.45, 0, 0, 7); ctx.fill(); ctx.beginPath(); ctx.ellipse(x + dir*taille*.9, yy, taille*.45, taille*.3, 0, 0, 7); ctx.fill(); }
+      else if (forme === 'sabot'){ ctx.beginPath(); ctx.ellipse(x - 1.2, yy, taille*.5, taille*.8, 0, 0, 7); ctx.fill(); ctx.beginPath(); ctx.ellipse(x + 1.2, yy, taille*.5, taille*.8, 0, 0, 7); ctx.fill(); }
+      else { ctx.beginPath(); ctx.arc(x, yy, taille, 0, 7); ctx.fill(); }
+    }
+  }
+}
+/* le visiteur de la nuit qui traverse en ce moment (ou celui que montre l'Atelier) */
+function visiteurMaintenant(w){
+  if (!prov()) return null;
+  if (apercuVisiteur){
+    const k = (clock - apercuVisiteur.t0) / (apercuVisiteur.id === 'cerf' ? 26 : 16);
+    if (k < 1) { const reg = NUIT.visiteurs.find(v => v.id === apercuVisiteur.id); return { id: reg.id, y: reg.y, sens: reg.sens, k }; }
+    apercuVisiteur = null;
+  }
+  return VIE.visiteurA(NUIT, w.y,w.m,w.d,w.hour);
+}
+function posVisiteur(v){ return v.sens > 0 ? lerp(150, 1500, v.k) : lerp(1250, 200, v.k); }
+function drawVisiteur(v, L, night){
+  const x = posVisiteur(v), y = v.y, k = .3+.7*L, f = v.sens, pas = Math.sin(clock*9)*3;
+  ctx.save(); ctx.translate(x, y); ctx.scale(f, 1); ctx.lineCap = 'round';
+  if (v.id === 'renard'){
+    const c = col([182,98,48], k);
+    ctx.strokeStyle = c; ctx.lineWidth = 2;
+    for (const [lx, s] of [[-9,1],[-6,-1],[7,1],[10,-1]]){ ctx.beginPath(); ctx.moveTo(lx, -8); ctx.lineTo(lx + s*pas*.6, 0); ctx.stroke(); }
+    ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(0, -11, 13, 5, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-12, -12); ctx.quadraticCurveTo(-26, -10, -30, -4); ctx.lineTo(-24, -6); ctx.quadraticCurveTo(-20, -9, -12, -9); ctx.fill();
+    ctx.fillStyle = col([236,230,220], k); ctx.beginPath(); ctx.arc(-29, -4.5, 2.4, 0, 7); ctx.fill();
+    ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(10, -14); ctx.lineTo(20, -12); ctx.lineTo(13, -8); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(11, -14); ctx.lineTo(12, -20); ctx.lineTo(15, -14); ctx.fill();
+    if (night > .4) glow(17, -12.5, 6, '220,255,170', .8);
+  } else {
+    const c = col([118,88,64], k);
+    ctx.strokeStyle = c; ctx.lineWidth = 2.6;
+    for (const [lx, s] of [[-16,1],[-12,-1],[14,1],[18,-1]]){ ctx.beginPath(); ctx.moveTo(lx, -24); ctx.lineTo(lx + s*pas*.8, 0); ctx.stroke(); }
+    ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(0, -30, 23, 9, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = col([232,226,214], k); ctx.beginPath(); ctx.ellipse(-21, -31, 4, 5, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(14, -36); ctx.lineTo(24, -54); ctx.lineTo(30, -50); ctx.lineTo(20, -30); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(31, -52, 7, 3.6, .4, 0, 7); ctx.fill();
+    ctx.strokeStyle = col([196,180,150], k); ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(26, -56); ctx.lineTo(22, -68); ctx.moveTo(24, -62); ctx.lineTo(18, -66); ctx.moveTo(23, -65); ctx.lineTo(27, -72); ctx.stroke();
+    if (night > .4) glow(34, -53, 7, '220,255,170', .8);
+  }
+  ctx.restore();
+}
+/* papillons de nuit autour de la lampe allumée, les nuits chaudes */
+function drawPapillons(info){
+  if (!prov() || !info.lampOn || info.night < .5 || vue.meteo.source === 'inconnue' || vue.meteo.temp == null || vue.meteo.temp < NUIT.papillons.tempMin || wx.rain > .1) return;
+  ctx.fillStyle = 'rgba(255,244,214,.85)';
+  for (let i = 0; i < 6; i++){ const a = clock*(1.7+i*.31) + i*1.9, r = 9 + (i*5)%13; ctx.fillRect(694 + Math.cos(a)*r*1.4, 560 + Math.sin(a*1.3)*r*.7, 1.6, 1.6); }
+}
+
 /* givre sur le banc et les rails : sous 0 °C, air humide, mesures réelles seulement */
 function givreActif(){
   const m = vue.meteo;
@@ -713,6 +842,13 @@ function drawSign(L, night, snowy){
   ctx.fillStyle = col([240,240,236], k); ctx.font = '500 7px "Zen Kaku Gothic New", sans-serif'; ctx.fillText('Nagori', x0+w/2, y0+h-2.5);
   ctx.textAlign = 'left'; ctx.fillText('←', x0+6, y0+h-2.5); ctx.textAlign = 'right'; ctx.fillText('→', x0+w-6, y0+h-2.5); ctx.textAlign = 'left';
   if (snowy){ ctx.fillStyle = col(C.snow, .42+.58*L); ctx.beginPath(); ctx.ellipse(x0+w/2, y0, w/2+2, 3+snowCover*3, 0, Math.PI, 0); ctx.fill(); }
+  /* les derniers jours (provisoire, lot H) : des fleurs déposées au pied du panneau */
+  if (curFerm && (curFerm.etape === 'derniers-jours' || curFerm.etape === 'dernier-jour' || curFerm.fermee)){
+    const bx = x0+w-30, by = 682, kk = .3+.7*L;
+    ctx.strokeStyle = col([70,100,60], kk); ctx.lineWidth = 1.2; for (let i=-2;i<=2;i++){ ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx+i*3, by-14); ctx.stroke(); }
+    ctx.fillStyle = col([236,232,222], kk); ctx.beginPath(); ctx.moveTo(bx-5, by); ctx.lineTo(bx-8, by-10); ctx.lineTo(bx+8, by-10); ctx.lineTo(bx+5, by); ctx.fill();
+    for (const [dx, c] of [[-6,[214,92,100]],[-2,[240,214,90]],[3,[226,226,236]],[7,[200,120,170]]]){ ctx.fillStyle = col(c, kk); ctx.beginPath(); ctx.arc(bx+dx, by-15-Math.abs(dx)*.3, 2.4, 0, 7); ctx.fill(); }
+  }
 }
 function drawCat(spot, L, night){
   const [x,y] = CAT_POS[spot], k = .3+.7*L, c = col([66,58,54],k);
@@ -771,6 +907,13 @@ function figure(p, y, L, night){
     ctx.fillStyle = hair; ctx.beginPath(); ctx.arc(-1+lean,-69,7.4,Math.PI*.95,Math.PI*2.05); ctx.fill();
     if (p.kind==='lady'){ ctx.beginPath(); ctx.arc(-5+lean,-73,3.6,0,7); ctx.fill(); ctx.strokeStyle = col([80,60,44],k); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(12,-36); ctx.lineTo(18,-1); ctx.stroke(); ctx.fillStyle = col([60,92,140],k); ctx.fillRect(-14,-36,12,10); }
     if (p.kind==='kid'){ ctx.fillStyle = col([200,200,204],k); ctx.fillRect(-2,-58,6,3); ctx.strokeStyle = col([40,60,110],k); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-6,-57); ctx.lineTo(10,-34); ctx.stroke(); ctx.fillStyle = col([40,60,110],k); ctx.fillRect(6,-38,13,11); }
+    if (p.hat){ ctx.fillStyle = col([176,58,50],k); ctx.beginPath(); ctx.arc(1+lean,-69,7.8,Math.PI,0); ctx.fill(); ctx.fillRect(-7+lean,-70,16,3); ctx.beginPath(); ctx.arc(1+lean,-78,2.4,0,7); ctx.fill(); }
+    if (p.umbrella){                                  // parapluie ouvert (trait provisoire) : jaune pour l'écolier, prune pour la vieille dame
+      const uc = p.kind==='kid' ? [222,186,58] : [96,62,86];
+      ctx.strokeStyle = col([60,56,52],k); ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(7+lean,-40); ctx.lineTo(3+lean,-96); ctx.stroke();
+      ctx.fillStyle = col(uc,k); ctx.beginPath(); ctx.moveTo(-21+lean,-88); ctx.quadraticCurveTo(3+lean,-112,27+lean,-88); ctx.closePath(); ctx.fill();
+      if (snowCover > .25 || wx.snow > .3){ ctx.fillStyle = col(C.snow, .45+.55*L, .9); ctx.beginPath(); ctx.ellipse(3+lean,-100,13,3.5,0,Math.PI,0); ctx.fill(); }
+    }
     if (p.kind==='traveler'){
       ctx.strokeStyle = col([40,40,44],k); ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(14,-34); ctx.lineTo(16,-14); ctx.stroke();
       ctx.fillStyle = col([110,74,50],k); ctx.fillRect(13,-16,15,15);
@@ -779,7 +922,13 @@ function figure(p, y, L, night){
     if (p.kind==='worker'){
       ctx.fillStyle = col([238,238,232],k); ctx.beginPath(); ctx.arc(1,-71,8.4,Math.PI,0); ctx.fill(); ctx.fillRect(-8,-71,18,2.5);
       ctx.fillStyle = col([236,124,40],k); ctx.fillRect(-9,-56,18,4); ctx.fillRect(-10,-44,20,3);
-      ctx.strokeStyle = col([90,90,96],k); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(6,-34); ctx.lineTo(16,-50); ctx.stroke(); ctx.fillStyle = col([90,90,96],k); ctx.fillRect(13,-54,8,4);
+      if (p.shovel){                                  // la pelle à neige, au passage à niveau
+        const a = Math.sin(clock*2.6)*.35;
+        ctx.save(); ctx.translate(6,-38); ctx.rotate(.5 + a); ctx.strokeStyle = col([120,88,60],k); ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,36); ctx.stroke();
+        ctx.fillStyle = col([70,96,140],k); ctx.fillRect(-7,34,14,8); ctx.restore();
+        if (a > .3 && Math.random() < .3) puff(p.x - 26*sc, y - 6, 'breath');
+      }
+      else { ctx.strokeStyle = col([90,90,96],k); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(6,-34); ctx.lineTo(16,-50); ctx.stroke(); ctx.fillStyle = col([90,90,96],k); ctx.fillRect(13,-54,8,4); }
       if (p.lantern){ ctx.fillStyle = 'rgba(255,214,140,.95)'; ctx.fillRect(-20,-32,7,9); glow(-16,-28,70,'255,214,140',.5); }
     }
     if (winter && tempNow() < 3 && Math.random() < .02) puff(p.x + (p.face===1?-8:8)*sc, y - 66*sc, 'breath');
@@ -828,7 +977,7 @@ let flash = 0, lastFrame = performance.now(), clock = 0;
 const train = { phase:'idle', x:2000, t:0, stop:true, traveler:false };
 const STOP_X = 560, CAR = 300, GAP = 0;
 const trav = { state:'none', x:0, walk:0, alpha:1 };
-let water = null, sweep = null, purr = null, lastTrainKey = null, panelStep = 0, cur = null;
+let water = null, sweep = null, purr = null, lastTrainKey = null, panelStep = 0, cur = null, curFerm = null;
 
 function kindNow(){ return vue.meteo.kind; }
 
@@ -858,7 +1007,8 @@ function travelerState(w){
   const s = seasonOf(w.y,w.m,w.d), tv = travelerOf(s);
   const welcomed = save.gifts[tv.key] != null;
   const arrived = save.arrived[tv.key] || idx(w.y,w.m,w.d,w.hour) >= tv.at;
-  return { s, tv, welcomed, waiting: arrived && !welcomed };
+  const fermee = prov() && VIE.fermeture(FERM, w.y,w.m,w.d,w.hour).fermee;      // provisoire : plus de voyageur une fois la gare fermée
+  return { s, tv, welcomed, fermee, waiting: arrived && !welcomed && !fermee };
 }
 function updateTraveler(dt){
   if (trav.state==='walk'){ trav.x -= 38*dt; trav.walk += dt*7; if (trav.x <= 750){ trav.state='none'; const st = travelerState(worldTime()); save.arrived[st.tv.key] = true; persist(); showTraveler(); } }
@@ -872,7 +1022,9 @@ function computeInfo(w){
   const season = seasonOf(w.y, w.m, w.d), sun = sunState(w), moon = moonPhase(w.y,w.m,w.d,w.hour);
   const kind = kindNow(), nightish = sun.e < -.2;
   const flies = ((w.m===6 && w.d>=10) || (w.m===7 && w.d<=25)) && nightish && (kind==='clear'||kind==='partly');
-  const full = (1-Math.cos(2*Math.PI*moon))/2 > .97 && nightish && kind==='clear';
+  /* provisoire (lot F) : la vraie lune ; une pleine lune ne compte que si elle est levée */
+  const lune = prov() ? CIEL.moonAltAz(jstMs(w.y,w.m,w.d,w.hour), STATION.lat, STATION.lon) : null;
+  const full = (1-Math.cos(2*Math.PI*moon))/2 > .97 && nightish && kind==='clear' && (!lune || lune.elev > 5);
   const active = [];
   if (nightish && isRain(kind)) active.push('rainnight');
   if (kind==='fog' && sun.e > -.3 && sun.e < .25 && sun.morning) active.push('dawnfog');
@@ -886,18 +1038,19 @@ function computeInfo(w){
   const debris = sweep ? 1 : clamp(sinceSweep/20, 0, 1) * (season.season===2 ? 1 : .6);
   const lampOn = save.lamp === nightKey(w) && sun.e < .08;
   const tstate = travelerState(w);
-  return { season, sun, moon, flies, active, item, debris, lampOn, cat: catSpot(w), people: habitues(w), waiting: tstate.waiting, tstate };
+  const ferm = prov() ? VIE.fermeture(FERM, w.y,w.m,w.d,w.hour) : null;
+  return { season, sun, moon, lune, ferm, flies, active, item, debris, lampOn, cat: catSpot(w), people: habitues(w), waiting: tstate.waiting, tstate };
 }
 
 /* ---------- Registre ---------- */
 function eventsOfDay(y,m,d){
-  const R = T.registre, ev = [], wd = weekday(y,m,d), school = wd>=1 && wd<=5, p = dayPlan(y,m,d);
+  const R = T.registre, ev = [], school = jourDecole(y,m,d), p = dayPlan(y,m,d);
   const prev = addDays(y,m,d,-1), s = seasonOf(y,m,d);
   if (seasonOf(prev.y,prev.m,prev.d).ko !== s.ko) ev.push([0.01, tx(R.nouveauKo, {ko: koName(s.ko), sens: KO[s.ko][3].toLowerCase()}), true]);
   for (const c of p.cat) ev.push([c.from, c.spot==='roof' ? R.chatToit : R.chatBanc]);
   ev.push([7.8, school ? R.ecolierMatin : R.ecolierAbsent]);
   ev.push([10.6, R.cheminotMatin]);
-  ev.push([13.5, R.vieilleDame]);
+  { const mv = prov() ? magasin.a(jstMs(y,m,d,13)) : null; if (!mv || mv.source !== 'reelle' || VIE.vieilleVient(RG, mv)) ev.push([13.5, R.vieilleDame]); }
   if (school) ev.push([16.36, R.ecolierRetour]);
   const tv = travelerOf(s);
   if (dayKey(tv.day.y,tv.day.m,tv.day.d) === dayKey(y,m,d)) ev.push([tv.h + .03, R.voyageur, true]);
@@ -997,6 +1150,13 @@ function sceneHit(ev){
     if (x > 770 && x < 796 && y > 636 && y < 664){ if (e.tr && e.tr.type === 'thermos') return 'trace:' + e.tr.visuel; if (e.pose === 'thermos') return 'etagere'; }
   }
   if (info.waiting && trav.state==='none' && x > 736 && x < 790 && y > 600 && y < 686) return 'traveler';
+  if (prov()){                                   // session 3 (provisoire)
+    const w = worldTime(), v = visiteurMaintenant(w);
+    if (v && Math.abs(x - posVisiteur(v)) < 34 && y > v.y - 60 && y < v.y + 6) return 'prov:visiteur:' + v.id;
+    if (info.ferm && info.ferm.affiche && x > 522 && x < 548 && y > 594 && y < 628) return 'prov:affiche';
+    if (curFerm && (curFerm.etape === 'derniers-jours' || curFerm.etape === 'dernier-jour' || curFerm.fermee) && x > 970 && x < 992 && y > 660 && y < 684) return 'prov:fleurs';
+    for (const { p } of pistesDuJour(w)) if (Math.abs(y - p[2]) < 6 && x >= Math.min(p[0], p[1]) - 6 && x <= Math.max(p[0], p[1]) + 6) return 'prov:pas:' + p[7];
+  }
   { const e = etatObjets();
     if (x > 546 && x < 596 && y > 618 && y < 636) return 'etagere';
     if (x > 546 && x < 596 && y > 596 && y < 618 && e.tr && e.tr.type === 'lumiere') return 'trace:' + e.tr.visuel;
@@ -1042,7 +1202,8 @@ cv.addEventListener('click', ev => {
   if (cam.justDragged){ cam.justDragged = false; return; }
   const hit = sceneHit(ev); if (!hit) return;
   const info = computeInfo(worldTime());
-  if (hit==='cat'){ const [cx,cy] = CAT_POS[info.cat]; purr = {x:cx, y:cy-6, t:0}; son.event('purr'); toast(T.chatRonronne); }
+  if (hit==='cat'){ const [cx,cy] = CAT_POS[info.cat]; purr = {x:cx, y:cy-6, t:0}; son.event('purr'); toast(info.cat === 'salle' ? TP.chatSalle : T.chatRonronne); }
+  else if (hit.startsWith('prov:')){ const [, quoi, qui] = hit.split(':'); toast(quoi === 'visiteur' ? TP.visiteurs[qui] : quoi === 'pas' ? TP.pas[qui] : TP[quoi]); }
   else if (hit==='item'){ save.found.push({key:info.item.key, idx:info.item.idx}); persist(); toast(tx(T.objetRange, {objet: ITEMS[info.item.idx]})); }
   else if (hit==='traveler') showTraveler();
   else if (hit==='garden') gWater();
@@ -1141,6 +1302,28 @@ $('#lab-away').addEventListener('click', () => { openRegistre(Date.now() - 15*36
   sel.addEventListener('change', maj); $('#lab-habitude').addEventListener('change', maj);
   $('#lab-givre').addEventListener('change', ev => { apercuGivre = ev.target.checked; });
 }
+/* session 3 : interrupteur du provisoire, visiteur de la nuit, état du jour */
+$('#lab-provisoire').addEventListener('change', ev => { provOn = AVEC_ATELIER && ev.target.checked; bookSig = ''; });
+$('#lab-visiteur').addEventListener('change', ev => { const id = ev.target.value; ev.target.value = ''; if (!id) return; if (!prov()){ toast('Cochez d\'abord « provisoire ».'); return; } apercuVisiteur = { id, t0: clock }; });
+function labVie(w, info){
+  if (!prov()) return 'Provisoire masqué : le jeu tel que le voient les testeurs.';
+  const m = vue.meteo, ecole = jourDecole(w.y,w.m,w.d), oui = b => b ? 'oui' : 'non', F = info.ferm, l = info.lune;
+  const lignes = [];
+  for (const [id, f] of Object.entries(HAB.fiches)){
+    let auj = '';
+    if (id === 'ecolier') auj = ecole ? `vient aujourd'hui ; parapluie : ${oui(VIE.parapluie(RG, m))} ; bonnet : ${oui(VIE.bonnet(RG, m))}` : "pas d'école aujourd'hui";
+    if (id === 'vieille') auj = VIE.vieilleVient(RG, m) ? `vient (météo dessinée) ; parapluie : ${oui(VIE.parapluie(RG, m))}` : 'reste chez elle (météo dessinée)';
+    if (id === 'cheminot') auj = VIE.cheminotDeneige(RG, m) ? `déblaie le passage à niveau de ${hhmm(RG.cheminotDeneige.de)} à ${hhmm(RG.cheminotDeneige.a)}` : 'tournées habituelles';
+    if (id === 'chat') auj = `nom : ${f.nom || 'à choisir'} ; ${VIE.chatAbrite(RG, m) ? "à l'abri dans la salle d'attente" : 'dehors'} ; passages : ` + dayPlan(w.y,w.m,w.d).cat.map(c => `${hhmm(c.from)} (${c.spot === 'roof' ? 'toit' : 'banc'})`).join(', ');
+    lignes.push(`<b>${f.role}</b> · ${f.traits.join(' ; ')}.<br>Aujourd'hui : ${auj}.`);
+  }
+  const nuit = VIE.nuitDe(NUIT, w.y,w.m,w.d).map(v => `${v.id} vers ${hhmm(v.debut)}`).join(', ') || 'personne';
+  lignes.push(`<b>Nuit</b> · visiteurs de ce soir : ${nuit}. Lune : ${l.elev > 0 ? 'levée, ' + Math.round(l.elev) + '° de hauteur, azimut ' + Math.round(l.az) + '°' : 'sous l\'horizon'}, éclairée à ${Math.round(l.lit*100)} %.`);
+  lignes.push(`<b>Fermeture</b> · dernier jour de service : ${frDate(...FERM.dernierJour.split('-').map(Number), {day:'numeric', month:'long', year:'numeric'})}, dernier arrêt ${hhmm(FERM.dernierArret.h + FERM.dernierArret.m/60)}. ` +
+    (F.fermee ? 'La gare est fermée : les trains passent sans s\'arrêter, la salle est éteinte.' : `Encore ${F.joursRestants} jour${F.joursRestants > 1 ? 's' : ''} (étape : ${F.etape}).`) +
+    ` Compte à rebours à partir de J−${FERM.etapes.compteARebours}, fleurs à partir de J−${FERM.etapes.derniersJours}.`);
+  return lignes.join('<br><br>');
+}
 $('#lab-gifts').addEventListener('click', () => { save.preview = !save.preview; persist(); toast(save.preview ? 'Aperçu : la gare avec six omiyage.' : 'Aperçu retiré.'); });
 $('#lab-reset').addEventListener('click', () => { save = fresh(); save.lastVisit = Date.now(); persist(); bookSig = ''; renderBook(-1); $('#traveler').hidden = true; toast('Tout est remis à zéro.'); });
 $('#lab-place').textContent = `Gare placée à ${STATION.lat}° N, ${STATION.lon}° E : ${STATION.place}. Arrêts à ${TRAINS.filter(t=>t.stop).map(t=>hhmm(t.h+t.m/60)).join(', ')} ; trains sans arrêt à ${TRAINS.filter(t=>!t.stop).map(t=>hhmm(t.h+t.m/60)).join(', ')}.`;
@@ -1201,9 +1384,14 @@ function hud(w, info){
   else { wxText = mt.statut === 'attente' ? T.meteoAttente : mt.statut === 'heure-inconnue' ? T.meteoInconnue : T.meteoIndispo; if (groundSnow()) wxText += ` · ${T.neigeAuSol}`; }
   $('#wx-status').textContent = statutMeteo();
   $('#sub').textContent = `${phaseLabel(info.sun)} · ${wxText}`;
-  $('#next-train').textContent = train.phase==='idle' ? tx(T.prochainArret, {heure: nextStop(w.hour)}) : train.phase==='pass' ? T.trainPasse : train.phase==='stop' ? T.trainEnGare : T.trainApproche;
+  const F = info.ferm;
+  $('#next-train').textContent = train.phase==='idle' ? (F && F.fermee ? TP.fermee : tx(T.prochainArret, {heure: nextStop(w.hour)})) : train.phase==='pass' ? T.trainPasse : train.phase==='stop' ? T.trainEnGare : T.trainApproche;
+  { const fl = $('#ferm-line'), t = !F || F.fermee ? '' : F.etape === 'dernier-jour' ? TP.dernierJour : F.compte != null ? tx(TP.compte, {n: F.compte}) : '';
+    fl.hidden = !t; fl.textContent = t; }
+  if (ATELIER) $('#lab-vie').innerHTML = labVie(w, info);
   const st = info.tstate; let tl = '';
-  if (st.waiting) tl = T.voyageurAttend;
+  if (st.fermee) tl = '';
+  else if (st.waiting) tl = T.voyageurAttend;
   else if (!st.welcomed) tl = tx(T.voyageurAnnonce, {date: frDate(st.tv.day.y,st.tv.day.m,st.tv.day.d), heure: hhmm(st.tv.h)});
   else { let d = {y:w.y,m:w.m,d:w.d}; for (let n=0;n<20;n++){ d = addDays(d.y,d.m,d.d,1); const s2 = seasonOf(d.y,d.m,d.d); if (s2.i !== st.s.i){ const t2 = travelerOf(s2); tl = tx(T.voyageurProchain, {date: frDate(t2.day.y,t2.day.m,t2.day.d), heure: hhmm(t2.h)}); break; } } }
   $('#trav-line').textContent = tl;
@@ -1239,7 +1427,7 @@ function hud(w, info){
 }
 function checkSchedule(w){
   const mins = Math.floor(w.hour*60);
-  for (const t of TRAINS){ const tm = t.h*60+t.m; if (mins === tm){ const key = `${dayKey(w.y,w.m,w.d)}-${tm}`; if (key !== lastTrainKey){ lastTrainKey = key; const st = travelerState(w); const isTv = t.h===N.VOYAGEUR.h && t.m===N.VOYAGEUR.m && dayKey(st.tv.day.y,st.tv.day.m,st.tv.day.d)===dayKey(w.y,w.m,w.d) && !st.welcomed && !save.arrived[st.tv.key]; startTrain({stop:t.stop, traveler:isTv}); } } }
+  for (const t of TRAINS){ const tm = t.h*60+t.m; if (mins === tm){ const key = `${dayKey(w.y,w.m,w.d)}-${tm}`; if (key !== lastTrainKey){ lastTrainKey = key; const st = travelerState(w); const isTv = t.h===N.VOYAGEUR.h && t.m===N.VOYAGEUR.m && dayKey(st.tv.day.y,st.tv.day.m,st.tv.day.d)===dayKey(w.y,w.m,w.d) && !st.welcomed && !save.arrived[st.tv.key]; const ferm = prov() ? VIE.fermeture(FERM, w.y,w.m,w.d,w.hour) : null; startTrain({stop:t.stop && !(ferm && ferm.fermee), traveler:isTv && !(ferm && ferm.fermee)}); } } }
 }
 let lastObjets = -1e9;
 function frame(now){

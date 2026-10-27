@@ -101,6 +101,20 @@ NAGORI.TEXTES = {
   },
   objetRange: 'Tu as rangé {objet} aux objets trouvés.',
 
+  /* session 3 (lots F, G, H) : emplacements provisoires, visibles seulement avec ?atelier tant qu'Arsène ne les a pas écrits */
+  provisoire: {
+    ardoise: 'あと{n}日',                       /* le compte à rebours à la craie, sur le tableau (forme à valider) */
+    compte: '(texte à écrire : fermeture dans {n} jours)',
+    dernierJour: '(texte à écrire : le dernier jour de service)',
+    fermee: '(texte à écrire : la gare est fermée)',
+    visiteurs: { renard: '(texte à écrire : un renard traverse le quai)', cerf: '(texte à écrire : un cerf traverse la voie)' },
+    pas: { ecolier: '(texte à écrire : les pas de l\'écolier)', chat: '(texte à écrire : des pas de chat)',
+           renard: '(texte à écrire : des pas de renard, cette nuit)', cerf: '(texte à écrire : des pas de cerf sur la voie)' },
+    chatSalle: '(texte à écrire : le chat au chaud, derrière la vitre)',
+    fleurs: '(texte à écrire : des fleurs au pied du panneau)',
+    affiche: '(texte à écrire : l\'avis de fermeture)'
+  },
+
   /* registre */
   registreDepuis: 'Depuis ta dernière visite, il y a {duree}.',
   registrePremiere: "Première visite. Voici la journée d'aujourd'hui avant ton arrivée.",

@@ -30,6 +30,7 @@
         <div class="sub" id="sub"></div>
         <div class="sub quiet" id="next-train"></div>
         <div class="sub call" id="trav-line"></div>
+        <div class="sub quiet" id="ferm-line" hidden></div>
       </section>
       <section class="card season">
         <div class="eyebrow">Sekki <span id="sekki-num" class="mono"></span>/24 · Kō <span id="ko-num" class="mono"></span>/72</div>
@@ -144,6 +145,12 @@
       <button id="lab-gifts">Voir tous les omiyage</button>
       <button id="lab-reset">Tout remettre à zéro</button>
     </div>
+    <h3>Session 3 : nuit, habitués, fermeture (provisoire)</h3>
+    <label class="check" for="lab-provisoire"><input type="checkbox" id="lab-provisoire" checked> Montrer les traits et textes provisoires (à valider par Arsène)</label>
+    <div class="note">Décoché : le jeu tel que le voient les testeurs. Les traits viennent de <span class="mono">data/habitues.js</span>, les textes de <span class="mono">data/textes.js</span> (<span class="mono">provisoire</span>).</div>
+    <label for="lab-visiteur">Faire passer un visiteur de la nuit</label>
+    <select id="lab-visiteur"><option value="">Aucun</option><option value="renard">Renard (sur le quai)</option><option value="cerf">Cerf (sur la voie)</option></select>
+    <div class="note" id="lab-vie"></div>
     <h3>Horaires des habitués (heure de Tokyo)</h3>
     <div class="note">L'écolier : 07:30 à 07:48 et retour par le train de 16:20, en semaine. La vieille dame : sur le banc de 13:00 à 13:35, elle regarde partir le train de 13:30. Le cheminot : sur la voie vers 10:30 et 21:30. Le chat : trois passages par jour, à des heures qui changent chaque jour.</div>
     <div class="note" id="lab-place"></div>
@@ -158,6 +165,8 @@
 <script src="js/meteo.js?v=202610181605"></script>
 <script src="data/objets.js?v=202610181605"></script>
 <script src="js/objets.js?v=202610181605"></script>
+<script src="data/habitues.js?v=202610181605"></script>
+<script src="js/vie.js?v=202610181605"></script>
 <script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
 <script src="js/jeu.js?v=202610181605"></script>
 </body>

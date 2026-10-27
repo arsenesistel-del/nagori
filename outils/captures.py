@@ -2,7 +2,11 @@
 
   python3 outils/captures.py prendre tests/captures/avant-session-1
   python3 outils/captures.py prendre DOSSIER --etat nuit-neige
+  python3 outils/captures.py prendre DOSSIER --session3     (états de la session 3, provisoire affiché)
   python3 outils/captures.py comparer AVANT APRES
+
+Depuis la session 3, les prises ordinaires décochent « provisoire » dans l'Atelier : elles montrent le jeu tel que
+le voient les testeurs, et restent comparables aux références des sessions 1 et 2. --session3 montre le provisoire.
 
 Le jeu est servi depuis le dossier du dépôt, avec le Chromium de l'espace de travail
 (Playwright). Pour que deux prises successives soient comparables :
@@ -43,6 +47,20 @@ TRACES = [
     ('trace-pas-renard',      '2026-11-20', 10.0, 'overcast',  True,  'lumiere:renard',         False, False),
     ('trace-banc-deplace',    '2026-11-20', 10.0, 'overcast',  True,  'lumiere:abri',           False, False),
 ]
+
+# session 3 (provisoire affiché) : nom, date, heure, météo, neige au sol, visiteur de la nuit montré par l'Atelier
+SESSION3 = [
+    ('s3-nuit-pleine-lune',    '2026-11-25', 0.5,   'clear',     True,  None),
+    ('s3-ecolier-parapluie',   '2026-11-17', 7.62,  'rain',      False, None),
+    ('s3-cheminot-deneige',    '2026-11-18', 10.8,  'snow',      True,  None),
+    ('s3-chat-salle',          '2026-11-18', 9.5,   'snow',      True,  None),
+    ('s3-renard',              '2026-11-20', 23.0,  'overcast',  True,  'renard'),
+    ('s3-cerf',                '2026-11-20', 23.0,  'clear',     True,  'cerf'),
+    ('s3-compte-a-rebours',    '2027-02-20', 16.5,  'overcast',  False, None),
+    ('s3-gare-fermee',         '2027-03-13', 20.0,  'clear',     False, None),
+]
+
+PROVISOIRE = "(v) => { const e = document.getElementById('lab-provisoire'); e.checked = v; e.dispatchEvent(new Event('change', {bubbles: true})); }"
 
 GRAINE = """
 (() => { let s = 123456789;
@@ -91,6 +109,7 @@ def prendre_traces(dossier):
             page.goto(f'http://127.0.0.1:{port}/?atelier')
             page.clock.run_for(1500)
             page.evaluate("document.querySelectorAll('[data-close]').forEach(b => b.click())")
+            page.evaluate(PROVISOIRE, False)
             page.evaluate(REGLER, [date, heure, meteo, sol, None])
             page.evaluate("([t, h, g]) => { const set = (id, v) => { const e = document.getElementById(id); e.checked = v; e.dispatchEvent(new Event('change', {bubbles: true})); };"
                           " set('lab-habitude', h); set('lab-givre', g); const s = document.getElementById('lab-trace'); s.value = t; s.dispatchEvent(new Event('change', {bubbles: true})); }", [trace, hab, givre])
@@ -121,11 +140,41 @@ def prendre(dossier, seul=None):
             page.goto(f'http://127.0.0.1:{port}/?atelier')
             page.clock.run_for(1500)
             page.evaluate("document.querySelectorAll('[data-close]').forEach(b => b.click())")
+            page.evaluate(PROVISOIRE, False)
             page.evaluate(REGLER, [date, heure, meteo, sol, vent])
             for _ in range(24):          # 24 s simulées : la météo et la neige ont le temps de s'installer
                 page.clock.run_for(1000)
             page.screenshot(path=str(dossier / f'{nom}.png'))
             print('capture', nom, '(erreurs : %d)' % len(erreurs))
+            for e in erreurs[:5]: print('   ', e)
+            ctx.close()
+        nav.close()
+
+
+def prendre_session3(dossier):
+    """États de la session 3, avec les traits et textes provisoires (Atelier)."""
+    from playwright.sync_api import sync_playwright
+    dossier = pathlib.Path(dossier); dossier.mkdir(parents=True, exist_ok=True)
+    with serveur() as port, sync_playwright() as p:
+        nav = p.chromium.launch(args=['--no-sandbox'])
+        for nom, date, heure, meteo, sol, visiteur in SESSION3:
+            ctx = nav.new_context(viewport={'width': 1280, 'height': 720}, device_scale_factor=1, service_workers='block')
+            ctx.route('**/*', lambda r: r.continue_() if r.request.url.startswith('http://127.0.0.1') else r.abort())
+            page = ctx.new_page(); erreurs = []
+            page.on('pageerror', lambda e: erreurs.append(str(e)))
+            page.clock.install(time=datetime.datetime(2026, 11, 17, 12, 0, 0, tzinfo=datetime.timezone.utc))
+            page.add_init_script(GRAINE)
+            page.goto(f'http://127.0.0.1:{port}/?atelier')
+            page.clock.run_for(1500)
+            page.evaluate("document.querySelectorAll('[data-close]').forEach(b => b.click())")
+            page.evaluate(PROVISOIRE, True)
+            page.evaluate(REGLER, [date, heure, meteo, sol, None])
+            for _ in range(12): page.clock.run_for(1000)
+            if visiteur:
+                page.evaluate("(v) => { const s = document.getElementById('lab-visiteur'); s.value = v; s.dispatchEvent(new Event('change')); }", visiteur)
+                for _ in range(6): page.clock.run_for(1000)
+            page.screenshot(path=str(dossier / f'{nom}.png'))
+            print('capture', nom, '(erreurs : %d)' % len(erreurs), flush=True)
             for e in erreurs[:5]: print('   ', e)
             ctx.close()
         nav.close()
@@ -151,8 +200,8 @@ def comparer(avant, apres, seuil=12):
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     sp = ap.add_subparsers(dest='cmd', required=True)
-    a = sp.add_parser('prendre'); a.add_argument('dossier'); a.add_argument('--etat'); a.add_argument('--traces', action='store_true')
+    a = sp.add_parser('prendre'); a.add_argument('dossier'); a.add_argument('--etat'); a.add_argument('--traces', action='store_true'); a.add_argument('--session3', action='store_true')
     c = sp.add_parser('comparer'); c.add_argument('avant'); c.add_argument('apres')
     args = ap.parse_args()
-    if args.cmd == 'prendre': (prendre_traces(args.dossier) if args.traces else prendre(args.dossier, args.etat))
+    if args.cmd == 'prendre': (prendre_traces(args.dossier) if args.traces else prendre_session3(args.dossier) if args.session3 else prendre(args.dossier, args.etat))
     else: comparer(args.avant, args.apres)

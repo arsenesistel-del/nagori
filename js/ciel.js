@@ -96,5 +96,26 @@ function nextKo(ms, n = 3){
 /* phase de la lune, de 0 (nouvelle) à 1 */
 function moonPhase(ms){ const days = (ms - Date.UTC(2000, 0, 6, 18, 14)) / DAY; return ((days / 29.530588853) % 1 + 1) % 1; }
 
-N.ciel = { sunLongitude, sunAltAz, crossing, koStarts, seasonOf, nextKo, moonPhase, jstDate };
+/* la lune à la gare (session 3, lot F) : position de faible précision (termes principaux de Meeus, chap. 47,
+   environ 0,3°, soit quelques minutes sur un lever), corrigée de la parallaxe. elev, az en degrés (az depuis le nord vers l'est) ;
+   phase de 0 (nouvelle) à 1, d'après l'écart réel entre la lune et le soleil ; lit = part éclairée du disque. */
+function moonAltAz(ms, lat, lon){
+  const jd = jdOf(ms), T = (jd - 2451545) / 36525, s = a => Math.sin(a * RAD), c = a => Math.cos(a * RAD);
+  const lamDeg = norm(218.316 + 481267.881 * T + 6.29 * s(134.9 + 477198.85 * T) - 1.27 * s(259.2 - 413335.38 * T)
+    + .66 * s(235.7 + 890534.23 * T) + .21 * s(269.9 + 954397.7 * T) - .19 * s(357.5 + 35999.05 * T) - .11 * s(186.6 + 966404.05 * T));
+  const bet = (5.13 * s(93.3 + 483202.03 * T) + .28 * s(228.2 + 960400.87 * T) - .28 * s(318.3 + 6003.18 * T) - .17 * s(217.6 - 407332.2 * T)) * RAD;
+  const par = .9508 + .0518 * c(134.9 + 477198.85 * T) + .0095 * c(259.2 - 413335.38 * T) + .0078 * c(235.7 + 890534.23 * T) + .0028 * c(269.9 + 954397.7 * T);
+  const lam = lamDeg * RAD, eps = (23.439291 - 0.0130042 * T) * RAD;
+  const ra = Math.atan2(Math.sin(lam) * Math.cos(eps) - Math.tan(bet) * Math.sin(eps), Math.cos(lam));
+  const dec = Math.asin(Math.sin(bet) * Math.cos(eps) + Math.cos(bet) * Math.sin(eps) * Math.sin(lam));
+  const gmst = norm(280.46061837 + 360.98564736629 * (jd - 2451545) + 0.000387933 * T * T);
+  const H = (gmst + lon) * RAD - ra, phi = lat * RAD;
+  const geo = Math.asin(Math.sin(phi) * Math.sin(dec) + Math.cos(phi) * Math.cos(dec) * Math.cos(H)) / RAD;
+  const elev = geo - par * Math.cos(geo * RAD);
+  const az = norm(Math.atan2(-Math.sin(H), Math.tan(dec) * Math.cos(phi) - Math.sin(phi) * Math.cos(H)) / RAD);
+  const phase = norm(lamDeg - sunLongitude(ms)) / 360;
+  return { elev, az, phase, lit: (1 - Math.cos(2 * Math.PI * phase)) / 2, ra: norm(ra / RAD), dec: dec / RAD, lam: lamDeg, bet: bet / RAD };
+}
+
+N.ciel = { sunLongitude, sunAltAz, crossing, koStarts, seasonOf, nextKo, moonPhase, moonAltAz, jstDate };
 })();
