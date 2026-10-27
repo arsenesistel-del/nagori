@@ -40,3 +40,31 @@ NAGORI.MOMENTS = [
   { id: 'tsukimi', nom: "Lune d'automne sans nuages", rar: 'Légendaire' },
   { id: 'lasttrain', nom: 'Dernier train du 31 décembre', rar: 'Légendaire' }
 ];
+
+/* La nuit et le petit matin (lot F, cahier des charges). Chaque événement a sa cause écrite ici ; aucun n'est là pour remplir un quota.
+   Heures de la gare ; après minuit, la nuit compte depuis le soir précédent (+24). Le tirage est commun à tous les joueurs pour une nuit
+   (graine : la date du soir). La météo qui sert de cause est la météo réelle (Open-Meteo), la même pour tous.
+   - routine : quotidienne, discrète, sans annonce ;
+   - evenements : seulement s'ils ont une raison, rien n'est garanti chaque soir. */
+NAGORI.NUIT = {
+  routine: {
+    /* le livreur de journaux en scooter passe le passage à niveau, phare allumé (pratique réelle, heure imaginée) */
+    livreur: { de: 28.083, a: 28.333, duree: .012 },
+    /* une fenêtre de ferme s'allume sur l'autre rive vers 4 h 30, jusqu'au lever du soleil (imaginé, plausible) */
+    ferme: { de: 28.33, a: 28.67 }
+  },
+  evenements: {
+    /* chasse-neige routier sur le passage à niveau, gyrophare, bourrelet de neige.
+       Cause : au moins 2 cm de neige réelle tombée dans les 6 h qui précèdent son passage. Seulement ces nuits-là. */
+    chasseNeige: { de: 25, a: 27.5, duree: .012, neigeCm: 2, fenetreH: 6 },
+    /* le cheminot dégage la neige du quai à la lanterne, vers 5 h. Même cause, mesurée à 5 h. Seulement ces matins-là. */
+    cheminotQuai: { de: 29, a: 29.75, neigeCm: 2, fenetreH: 6 },
+    /* cerfs d'Ezo qui traversent la voie, yeux qui brillent sous la lampe. Cause : la saison (plus fréquents en automne) ;
+       rares dans la neige profonde (au moins neigeProfondeCm de neige réelle au sol au moment du passage). Souvent aucun. */
+    cerfs: { chance: .12, automne: .3, mois: [9, 10, 11], neigeProfondeCm: 40, facteurNeige: .2, de: 22, a: 28.5, duree: .05, max: 3 },
+    /* un renard près de la salle d'attente. Aucune cause particulière : environ 2 nuits sur 10. */
+    renard: { chance: .2, de: 22, a: 28.5, duree: .04 }
+  },
+  /* provisoire, hors cahier (session 3, première version) : papillons de nuit autour de la lampe */
+  papillons: { tempMin: 15 }
+};

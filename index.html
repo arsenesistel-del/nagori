@@ -59,6 +59,11 @@
         <div class="et-liste" id="et-liste"></div>
         <div class="row"><button id="et-fermer">Fermer</button></div>
       </section>
+      <section class="card traveler etagere" id="cahier" hidden aria-label="Cahier de la gare">
+        <div class="eyebrow" id="ca-titre"></div>
+        <div class="ca-liste" id="ca-liste"></div>
+        <div class="row"><button id="ca-fermer">Fermer</button></div>
+      </section>
       <div class="toast" id="toast" hidden></div>
       <div class="gestures" aria-label="Gestes du jour">
         <span class="label">Gestes du jour</span>
@@ -145,11 +150,11 @@
       <button id="lab-gifts">Voir tous les omiyage</button>
       <button id="lab-reset">Tout remettre à zéro</button>
     </div>
-    <h3>Session 3 : nuit, habitués, fermeture (provisoire)</h3>
-    <label class="check" for="lab-provisoire"><input type="checkbox" id="lab-provisoire" checked> Montrer les traits et textes provisoires (à valider par Arsène)</label>
-    <div class="note">Décoché : le jeu tel que le voient les testeurs. Les traits viennent de <span class="mono">data/habitues.js</span>, les textes de <span class="mono">data/textes.js</span> (<span class="mono">provisoire</span>).</div>
-    <label for="lab-visiteur">Faire passer un visiteur de la nuit</label>
-    <select id="lab-visiteur"><option value="">Aucun</option><option value="renard">Renard (sur le quai)</option><option value="cerf">Cerf (sur la voie)</option></select>
+    <h3>Nuit, habitués, fermeture (lots F, G, H)</h3>
+    <div class="note">Le calendrier de la fermeture se voit en simulant les dates du test (17 au 30 novembre 2026). Réglages : <span class="mono">data/monde.js</span> (nuit), <span class="mono">data/fermeture.js</span>, <span class="mono">data/craie.js</span>, <span class="mono">data/habitues.js</span>.</div>
+    <label class="check" for="lab-provisoire"><input type="checkbox" id="lab-provisoire" checked> Montrer aussi le provisoire hors cahier (lune, papillons, pas dans la neige, traits météo, fin de service, fleurs, bandeau)</label>
+    <label for="lab-visiteur">Faire passer (nuit, aperçu sans rien enregistrer)</label>
+    <select id="lab-visiteur"><option value="">Aucun</option><option value="livreur">Livreur de journaux</option><option value="chasseNeige">Chasse-neige (et son bourrelet)</option><option value="cheminotQuai">Cheminot qui dégage le quai</option><option value="cerfs">Cerfs sur la voie</option><option value="renard">Renard près de la salle d'attente</option></select>
     <div class="note" id="lab-vie"></div>
     <h3>Horaires des habitués (heure de Tokyo)</h3>
     <div class="note">L'écolier : 07:30 à 07:48 et retour par le train de 16:20, en semaine. La vieille dame : sur le banc de 13:00 à 13:35, elle regarde partir le train de 13:30. Le cheminot : sur la voie vers 10:30 et 21:30. Le chat : trois passages par jour, à des heures qui changent chaque jour.</div>
@@ -166,6 +171,8 @@
 <script src="data/objets.js?v=202610181605"></script>
 <script src="js/objets.js?v=202610181605"></script>
 <script src="data/habitues.js?v=202610181605"></script>
+<script src="data/fermeture.js?v=202610181605"></script>
+<script src="data/craie.js?v=202610181605"></script>
 <script src="js/vie.js?v=202610181605"></script>
 <script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
 <script src="js/jeu.js?v=202610181605"></script>

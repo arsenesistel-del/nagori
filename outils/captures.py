@@ -2,7 +2,7 @@
 
   python3 outils/captures.py prendre tests/captures/avant-session-1
   python3 outils/captures.py prendre DOSSIER --etat nuit-neige
-  python3 outils/captures.py prendre DOSSIER --session3     (états de la session 3, provisoire affiché)
+  python3 outils/captures.py prendre DOSSIER --session3     (lots F, G, H, et provisoire hors cahier en p-)
   python3 outils/captures.py comparer AVANT APRES
 
 Depuis la session 3, les prises ordinaires décochent « provisoire » dans l'Atelier : elles montrent le jeu tel que
@@ -48,16 +48,24 @@ TRACES = [
     ('trace-banc-deplace',    '2026-11-20', 10.0, 'overcast',  True,  'lumiere:abri',           False, False),
 ]
 
-# session 3 (provisoire affiché) : nom, date, heure, météo, neige au sol, visiteur de la nuit montré par l'Atelier
+# lots F, G, H : nom, date, heure, météo, neige au sol, case provisoire, aperçu de nuit de l'Atelier (et secondes d'attente)
 SESSION3 = [
-    ('s3-nuit-pleine-lune',    '2026-11-25', 0.5,   'clear',     True,  None),
-    ('s3-ecolier-parapluie',   '2026-11-17', 7.62,  'rain',      False, None),
-    ('s3-cheminot-deneige',    '2026-11-18', 10.8,  'snow',      True,  None),
-    ('s3-chat-salle',          '2026-11-18', 9.5,   'snow',      True,  None),
-    ('s3-renard',              '2026-11-20', 23.0,  'overcast',  True,  'renard'),
-    ('s3-cerf',                '2026-11-20', 23.0,  'clear',     True,  'cerf'),
-    ('s3-compte-a-rebours',    '2027-02-20', 16.5,  'overcast',  False, None),
-    ('s3-gare-fermee',         '2027-03-13', 20.0,  'clear',     False, None),
+    ('h-17nov-avis-craie',       '2026-11-17', 9.0,   'overcast',  False, False, None, 0),
+    ('h-20nov-ecolier-avis',     '2026-11-20', 7.62,  'clear',     False, False, None, 0),
+    ('h-24nov-vieille-reste',    '2026-11-24', 13.8,  'overcast',  False, False, None, 0),
+    ('h-26nov-inventaire',       '2026-11-26', 10.62, 'overcast',  False, False, None, 0),
+    ('h-30nov-tout-en-place',    '2026-11-30', 12.0,  'clear',     False, False, None, 0),
+    ('f-livreur',                '2026-11-18', 4.15,  'clear',     False, False, 'livreur', 6),
+    ('f-ferme',                  '2026-11-18', 5.3,   'clear',     False, False, None, 0),
+    ('f-chasse-neige',           '2026-11-18', 2.0,   'snow',      True,  False, 'chasseNeige', 8),
+    ('f-bourrelet',              '2026-11-18', 2.5,   'overcast',  True,  False, 'chasseNeige', 20),
+    ('f-cheminot-quai',          '2026-11-18', 5.2,   'snow',      True,  False, 'cheminotQuai', 16),
+    ('f-cerfs',                  '2026-11-18', 23.0,  'clear',     False, False, 'cerfs', 17),
+    ('f-renard',                 '2026-11-18', 23.0,  'clear',     False, False, 'renard', 15),
+    ('p-pleine-lune',            '2026-11-25', 0.5,   'clear',     True,  True,  None, 0),
+    ('p-ecolier-parapluie',      '2026-11-17', 7.55,  'rain',      False, True,  None, 0),
+    ('p-chat-salle',             '2026-11-18', 9.5,   'snow',      True,  True,  None, 0),
+    ('p-gare-fermee',            '2027-03-13', 20.0,  'clear',     False, True,  None, 0),
 ]
 
 PROVISOIRE = "(v) => { const e = document.getElementById('lab-provisoire'); e.checked = v; e.dispatchEvent(new Event('change', {bubbles: true})); }"
@@ -152,12 +160,12 @@ def prendre(dossier, seul=None):
 
 
 def prendre_session3(dossier):
-    """États de la session 3, avec les traits et textes provisoires (Atelier)."""
+    """États des lots F, G, H (h- fermeture et habitués, f- nuit, aperçus de l'Atelier) et du provisoire hors cahier (p-)."""
     from playwright.sync_api import sync_playwright
     dossier = pathlib.Path(dossier); dossier.mkdir(parents=True, exist_ok=True)
     with serveur() as port, sync_playwright() as p:
         nav = p.chromium.launch(args=['--no-sandbox'])
-        for nom, date, heure, meteo, sol, visiteur in SESSION3:
+        for nom, date, heure, meteo, sol, prov, apercu, attente in SESSION3:
             ctx = nav.new_context(viewport={'width': 1280, 'height': 720}, device_scale_factor=1, service_workers='block')
             ctx.route('**/*', lambda r: r.continue_() if r.request.url.startswith('http://127.0.0.1') else r.abort())
             page = ctx.new_page(); erreurs = []
@@ -167,12 +175,12 @@ def prendre_session3(dossier):
             page.goto(f'http://127.0.0.1:{port}/?atelier')
             page.clock.run_for(1500)
             page.evaluate("document.querySelectorAll('[data-close]').forEach(b => b.click())")
-            page.evaluate(PROVISOIRE, True)
+            page.evaluate(PROVISOIRE, prov)
             page.evaluate(REGLER, [date, heure, meteo, sol, None])
             for _ in range(12): page.clock.run_for(1000)
-            if visiteur:
-                page.evaluate("(v) => { const s = document.getElementById('lab-visiteur'); s.value = v; s.dispatchEvent(new Event('change')); }", visiteur)
-                for _ in range(6): page.clock.run_for(1000)
+            if apercu:
+                page.evaluate("(v) => { const s = document.getElementById('lab-visiteur'); s.value = v; s.dispatchEvent(new Event('change')); }", apercu)
+                for _ in range(attente): page.clock.run_for(1000)
             page.screenshot(path=str(dossier / f'{nom}.png'))
             print('capture', nom, '(erreurs : %d)' % len(erreurs), flush=True)
             for e in erreurs[:5]: print('   ', e)

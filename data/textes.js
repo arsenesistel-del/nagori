@@ -101,19 +101,64 @@ NAGORI.TEXTES = {
   },
   objetRange: 'Tu as rangé {objet} aux objets trouvés.',
 
-  /* session 3 (lots F, G, H) : emplacements provisoires, visibles seulement avec ?atelier tant qu'Arsène ne les a pas écrits */
-  provisoire: {
-    ardoise: 'あと{n}日',                       /* le compte à rebours à la craie, sur le tableau (forme à valider) */
-    compte: '(texte à écrire : fermeture dans {n} jours)',
-    dernierJour: '(texte à écrire : le dernier jour de service)',
-    fermee: '(texte à écrire : la gare est fermée)',
-    visiteurs: { renard: '(texte à écrire : un renard traverse le quai)', cerf: '(texte à écrire : un cerf traverse la voie)' },
-    pas: { ecolier: '(texte à écrire : les pas de l\'écolier)', chat: '(texte à écrire : des pas de chat)',
-           renard: '(texte à écrire : des pas de renard, cette nuit)', cerf: '(texte à écrire : des pas de cerf sur la voie)' },
-    chatSalle: '(texte à écrire : le chat au chaud, derrière la vitre)',
-    fleurs: '(texte à écrire : des fleurs au pied du panneau)',
-    affiche: '(texte à écrire : l\'avis de fermeture)'
+  /* lots F, G, H (cahier des charges) : emplacements à écrire par Arsène. Le japonais est à relire par un natif. */
+  fermeture: {
+    avisTitre: '駅廃止のお知らせ',              /* titre court de l'avis officiel (à relire par un natif) */
+    avisDate: '3月12日',                        /* la date en gros : le dernier jour de service */
+    avisTraduction: '(texte à écrire : la traduction de l\'avis officiel)',
+    ardoise: 'あと{n}日',                       /* le compte à rebours à la craie (formulation à valider par un natif) */
+    ardoiseToucher: '(texte à écrire : le compte à rebours à la craie, d\'une main qu\'on ne connaît pas)',
+    afficheCommune: '(texte à écrire : l\'affiche de la commune, appel aux photos anciennes de la gare)',
+    photos: { 'photo-1': '(texte à écrire : la première photo ancienne)', 'photo-2': '(texte à écrire : la deuxième photo ancienne)' },
+    etiquettes: '(texte à écrire : les étiquettes numérotées de l\'inventaire)',
+    horloge: '(texte à écrire : l\'horloge de la salle d\'attente)',
+    cahierTitre: 'Cahier de la gare',
+    cahierJp: '駅ノート',
+    cahierEntrees: { 'cahier-1': '(texte à écrire : 1re entrée du cahier)', 'cahier-2': '(texte à écrire : 2e entrée du cahier, des visiteurs, un jour férié)',
+                     'cahier-3': '(texte à écrire : 3e entrée du cahier)' },
+    cahierVide: '(texte à écrire : le cahier, encore sans entrée)',
+    cahierOuvrir: 'Lire le cahier',
+    registre: {
+      'cahier-1': '(texte à écrire : registre, 1re entrée du cahier)', 'affiche-commune': '(texte à écrire : registre, l\'affiche de la commune)',
+      'moment-ecolier': '(texte à écrire : registre, le moment de l\'écolier)', 'photo-1': '(texte à écrire : registre, une première photo ancienne)',
+      'cahier-2': '(texte à écrire : registre, 2e entrée du cahier)', 'moment-vieille': '(texte à écrire : registre, le moment de la vieille dame)',
+      'moment-cheminot': '(texte à écrire : registre, l\'inventaire du cheminot)', 'photo-2': '(texte à écrire : registre, une deuxième photo ancienne)',
+      'cahier-3': '(texte à écrire : registre, 3e entrée du cahier)'
+    }
   },
+  /* le tableau à craie, une ligne par date (data/craie.js) */
+  craie: { 'craie-1': '(texte à écrire : ligne de craie 1)', 'craie-2': '(texte à écrire : ligne de craie 2)', 'craie-3': '(texte à écrire : ligne de craie 3)',
+           'craie-4': '(texte à écrire : ligne de craie 4)', 'craie-5': '(texte à écrire : ligne de craie 5)', 'craie-6': '(texte à écrire : ligne de craie 6)',
+           'craie-7': '(texte à écrire : ligne de craie 7)', aucune: '(texte à écrire : le tableau à craie)' },
+  /* deux lignes au toucher qui alternent, et la ligne du moment de fermeture (le chat ne parle jamais) */
+  habitues: {
+    ecolier: ['(texte à écrire : l\'écolier, ligne 1)', '(texte à écrire : l\'écolier, ligne 2)'],
+    vieille: ['(texte à écrire : la vieille dame, ligne 1)', '(texte à écrire : la vieille dame, ligne 2)'],
+    cheminot: ['(texte à écrire : le cheminot, ligne 1)', '(texte à écrire : le cheminot, ligne 2)'],
+    moments: { ecolier: '(texte à écrire : le moment de l\'écolier)', vieille: '(texte à écrire : le moment de la vieille dame)',
+               cheminot: '(texte à écrire : l\'inventaire du cheminot)' }
+  },
+  /* la nuit et le petit matin, au toucher */
+  nuit: {
+    livreur: '(texte à écrire : le livreur de journaux)', ferme: '(texte à écrire : la fenêtre de ferme sur l\'autre rive)',
+    chasseNeige: '(texte à écrire : le chasse-neige)', bourrelet: '(texte à écrire : le bourrelet de neige du chasse-neige)',
+    cheminotQuai: '(texte à écrire : le cheminot dégage le quai)', cerfs: '(texte à écrire : des cerfs sur la voie)',
+    renard: '(texte à écrire : un renard près de la salle d\'attente)'
+  },
+  registreNuit: {
+    chasseNeige: '(texte à écrire : registre, le chasse-neige est passé)', cheminotQuai: '(texte à écrire : registre, le cheminot a dégagé le quai)',
+    cerfs: '(texte à écrire : registre, des cerfs ont traversé la voie)', renard: '(texte à écrire : registre, un renard près de la salle d\'attente)'
+  },
+  /* provisoire, hors cahier (session 3, première version) : seulement avec la case « provisoire » de l'Atelier */
+  provisoire: {
+    compte: '(texte à écrire : fermeture dans {n} jours)',
+    fermee: '(texte à écrire : la gare est fermée)',
+    pas: { ecolier: '(texte à écrire : les pas de l\'écolier)', chat: '(texte à écrire : des pas de chat)',
+           renard: '(texte à écrire : des pas de renard, cette nuit)', cerfs: '(texte à écrire : des pas de cerf sur la voie)' },
+    chatSalle: '(texte à écrire : le chat au chaud, derrière la vitre)',
+    fleurs: '(texte à écrire : des fleurs au pied du panneau)'
+  },
+
 
   /* registre */
   registreDepuis: 'Depuis ta dernière visite, il y a {duree}.',

@@ -130,3 +130,7 @@ button:disabled{opacity:.45;cursor:default}
 .etagere .et-liste{display:flex;flex-direction:column;gap:8px;margin:10px 0}
 .etagere .et-ligne{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .etagere button[disabled]{opacity:.45;cursor:default}
+/* le cahier de la gare (駅ノート) */
+.etagere .ca-liste{display:flex;flex-direction:column;gap:10px;margin:10px 0;max-height:45vh;overflow:auto}
+.etagere .ca-entree time{font-size:.8em;opacity:.7}
+.etagere .ca-entree p{margin:2px 0 0}
