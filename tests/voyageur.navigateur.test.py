@@ -14,7 +14,7 @@ from playwright.sync_api import sync_playwright
 
 echecs = []
 MONDE = (RACINE / 'data/monde.js').read_text(encoding='utf-8')
-assert re.search(r'VOYAGEUR = \{ actif: (true|false),', MONDE)
+assert re.search(r'VOYAGEUR_TEST = \{ actif: (true|false),', MONDE)
 
 
 def ok(cond, msg):
@@ -26,7 +26,8 @@ def jst(y, m, d, h, mi=0, s=0):
     return datetime.datetime(y, m, d, h, mi, s, tzinfo=datetime.timezone.utc) - datetime.timedelta(hours=9)
 
 
-# une sauvegarde d'un joueur qui a déjà accueilli le voyageur de 立冬 (furin) et a un objet posé
+# une sauvegarde d'un joueur qui a accueilli le voyageur de 立冬 (furin) dans une version antérieure : un autre sekki que celui du test,
+# donc ni lui ni son omiyage n'apparaissent, même voyageur du test activé (cahier, lot J)
 SAUVEGARDE = {'version': 3, 'gifts': {'2026-11-07': 0}, 'arrived': {'2026-11-07': True}, 'stamps': [56], 'lastVisit': None,
               'objets': {'sel': 'essai', 'pose': None, 'trace': None, 'parapluieRetour': None, 'retourTrace': None,
                          'hist': {'thermos': [], 'parapluie': [], 'lumiere': []}}}
@@ -34,7 +35,7 @@ SAUVEGARDE = {'version': 3, 'gifts': {'2026-11-07': 0}, 'arrived': {'2026-11-07'
 
 def ouvrir(nav, port, actif, quand, query='', sauvegarde=None):
     ctx = nav.new_context(viewport={'width': 1280, 'height': 720}, service_workers='block')
-    monde = re.sub(r'VOYAGEUR = \{ actif: (true|false),', 'VOYAGEUR = { actif: ' + ('true' if actif else 'false') + ',', MONDE)
+    monde = re.sub(r'VOYAGEUR_TEST = \{ actif: (true|false),', 'VOYAGEUR_TEST = { actif: ' + ('true' if actif else 'false') + ',', MONDE)
     def route(r):
         url = r.request.url
         if not url.startswith('http://127.0.0.1'): return r.abort()
@@ -68,7 +69,8 @@ with captures.serveur() as port, sync_playwright() as p:
         ok(("voyageur" in texte(page, '#trav-line').lower()) == actif, f'{nom} : bandeau du voyageur {"présent" if actif else "vide"}')
         page.evaluate("document.getElementById('btn-book').click()"); page.clock.run_for(600)
         carnet = texte(page, "#book").lower()
-        ok(("voyageurs et omiyage" in carnet) == actif and ("un furin" in carnet) == actif, f'{nom} : section voyageurs et omiyage du carnet {"présente" if actif else "absente"}')
+        ok(("voyageurs et omiyage" in carnet) == actif and "un furin" not in carnet, f'{nom} : section voyageurs et omiyage du carnet {"présente" if actif else "absente"}, sans l\'omiyage d\'un autre sekki')
+        ok(("les voyageurs oublient" in carnet) == actif, f'{nom} : note des objets trouvés {"présente" if actif else "masquée"}')
         if not actif:
             hud = page.evaluate("[...document.querySelectorAll('.hud, #trav-line, #reg, #gifts, #traveler')].map(e => e.hidden ? '' : e.innerText).join(' ')")
             ok('voyageur' not in hud.lower(), 'désactivé : le mot « voyageur » n\'apparaît ni au bandeau, ni au registre, ni dans la section du carnet, ni au panneau')
@@ -81,7 +83,7 @@ with captures.serveur() as port, sync_playwright() as p:
         page.evaluate("document.querySelectorAll('[data-close]').forEach(b => b.click())")
         e = etat(page)
         ok(e['actif'] == actif and page.evaluate("document.getElementById('lab-voyageur').checked") == actif, f'{nom} : l\'Atelier lit le réglage du jeu')
-        ok((e['omiyage'] == [0]) == actif and (e['omiyage'] == []) != actif, f'{nom} : furin sur la façade {"présent" if actif else "absent"} ({e["omiyage"]})')
+        ok(e['omiyage'] == [], f'{nom} : l\'omiyage d\'un autre sekki n\'est pas sur la façade ({e["omiyage"]})')
         ok(page.evaluate("document.getElementById('lab-traveler').hidden") != actif, f'{nom} : bouton « Faire venir le voyageur » {"visible" if actif else "caché"}')
         marches = set()
         for _ in range(40):
@@ -107,11 +109,19 @@ with captures.serveur() as port, sync_playwright() as p:
     page.evaluate("document.querySelectorAll('[data-close]').forEach(b => b.click())")
     page.evaluate("(() => { const c = document.getElementById('lab-voyageur'); c.checked = true; c.dispatchEvent(new Event('change')); })()")
     page.clock.run_for(800)
-    ok(etat(page)['actif'] and etat(page)['omiyage'] == [0] and etat(page)['attend'], 'essai de l\'Atelier : le voyageur et ses omiyage reviennent, la sauvegarde n\'avait rien perdu')
+    ok(etat(page)['actif'] and etat(page)['attend'], 'essai de l\'Atelier : le voyageur du test revient, la sauvegarde n\'avait rien perdu')
     page.reload(); page.clock.run_for(2500)
     ok(not etat(page)['actif'] and etat(page)['omiyage'] == [], 'après rechargement : retour au réglage du jeu (désactivé), l\'essai n\'est pas enregistré')
     ok('voyageur' not in json.dumps(sauve(page)).lower() and 'essai' == sauve(page)['objets']['sel'], 'la sauvegarde ne contient aucun champ d\'essai')
     ok(not err, f'essai : aucune erreur ({err[:2]})')
+    ctx.close()
+
+    # 4. les voyageurs des autres sekki sont désactivés pendant toute la période, même voyageur du test activé
+    ctx, page, err = ouvrir(nav, port, True, jst(2026, 11, 10, 16, 19, 40), '?atelier')
+    page.evaluate("document.querySelectorAll('[data-close]').forEach(b => b.click())")
+    for _ in range(40): page.clock.run_for(1000)
+    e = etat(page)
+    ok(e['actif'] and not e['attend'] and e['marche'] == 'none' and texte(page, '#trav-line') == '', '10 novembre (voyageur de 立冬) : personne, même avec le voyageur du test activé')
     ctx.close()
     nav.close()
 

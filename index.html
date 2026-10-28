@@ -68,12 +68,15 @@
       </section>
       <div class="toast" id="toast" hidden></div>
       <button class="vignette" id="vignette" hidden></button>
-      <div class="gestures" aria-label="Gestes du jour">
-        <span class="label">Gestes du jour</span>
-        <button class="chip" id="g-sweep">Balayer le quai</button>
-        <button class="chip" id="g-water">Arroser</button>
-        <button class="chip" id="g-feed">Nourrir le chat</button>
-        <button class="chip" id="g-lamp">Allumer la lampe</button>
+      <div class="gestures" aria-label="Actions">
+        <button class="primary" id="btn-etagere">Étagère</button>
+        <button id="btn-gestes" aria-expanded="false" aria-controls="gestes-menu">Gestes</button>
+        <div class="gestes-menu" id="gestes-menu" hidden>
+          <button class="chip" id="g-sweep">Balayer le quai</button>
+          <button class="chip" id="g-water">Arroser</button>
+          <button class="chip" id="g-feed">Nourrir le chat</button>
+          <button class="chip" id="g-lamp">Allumer la lampe</button>
+        </div>
       </div>
       <nav class="actions" aria-label="Menus">
         <button id="btn-son" aria-pressed="false">Son</button>
@@ -81,7 +84,7 @@
         <button id="btn-book">Carnet<span class="count" id="book-count">0/72</span></button>
         <button id="btn-lab" hidden>Atelier</button>
       </nav>
-      <div class="foot">Nagori · version de travail · textes et dessins provisoires · Météo : modèles <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> pour ce lieu, pas une station d'observation</div>
+      <div class="foot"><span id="reel-imagine"></span><span class="reste"> Nagori · version de travail · textes et dessins provisoires · Météo : modèles <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> pour ce lieu, pas une station d'observation</span></div>
     </div>
   </div>
 
@@ -95,6 +98,7 @@
   <aside class="panel" id="book" hidden aria-label="Carnet">
     <header><h2>Carnet</h2><button class="close" data-close="book">Fermer</button></header>
     <div class="note">Ce que tu as vu et reçu cette année. Rien ne s'achète ; une micro-saison ratée revient l'an prochain.</div>
+    <div class="note" id="book-reel"></div>
     <h3>Moments</h3>
     <div class="list" id="moments"></div>
     <h3 id="gifts-titre">Voyageurs et omiyage</h3>
@@ -136,6 +140,8 @@
     <label for="lab-wind">Vent (simulé)</label>
     <input type="range" id="lab-wind" min="0" max="1" step="0.05" value="0.15">
     <div class="note" id="wx-status">Recherche de la météo réelle…</div>
+    <div class="row"><button id="lab-verif">Vérifier la météo réelle</button></div>
+    <div class="note" id="lab-verif-table"></div>
     <div class="note" id="lab-cal"></div>
 
     <h3>Objets et traces (aperçu, rien n'est enregistré)</h3>
@@ -163,7 +169,9 @@
     <h3>Récit de l'absence (lot E)</h3>
     <label for="lab-absence">Absence simulée, jusqu'à maintenant</label>
     <select id="lab-absence"><option value="5">5 heures</option><option value="20">20 heures</option><option value="60">2 jours et demi</option><option value="120">5 jours</option><option value="216">9 jours</option></select>
-    <div class="row"><button class="primary" id="lab-recit-lire">Composer et lire</button></div>
+    <div class="row"><button class="primary" id="lab-recit-lire">Composer et lire</button><button id="lab-recit-registre">Registre de cette absence</button></div>
+    <label for="lab-plan">Revoir un type de plan (le meilleur des 9 derniers jours)</label>
+    <select id="lab-plan"><option value="">Choisir…</option><option value="objet">1. Conséquence de l'objet</option><option value="voyageur">2. Arrivée du voyageur</option><option value="gare">3. Changement de la gare</option><option value="temps">4. Changement de temps</option><option value="lumiere">5. Lumière</option><option value="habitue">6. Habitué</option><option value="nuit">7. Vie de nuit</option><option value="ko">8. Changement de kō</option></select>
     <div class="note" id="lab-recit">Seule la météo réelle connue de ces heures sert ; rien n'est enregistré. Réglages : <span class="mono">data/recit.js</span>.</div>
     <h3>Horaires des habitués (heure de Tokyo)</h3>
     <div class="note">L'écolier : 07:30 à 07:48 et retour par le train de 16:20, en semaine. La vieille dame : sur le banc de 13:00 à 13:35, elle regarde partir le train de 13:30. Le cheminot : sur la voie vers 10:30 et 21:30. Le chat : trois passages par jour, à des heures qui changent chaque jour.</div>

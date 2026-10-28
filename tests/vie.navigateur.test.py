@@ -73,7 +73,7 @@ with captures.serveur() as port, sync_playwright() as p:
     # 2. textes « à écrire » : jamais en jeu normal (décision du 28 octobre) ; avec ?atelier, le registre a la ligne du changement
     ctx, page, err = ouvrir(nav, port, jst(2026, 11, 19, 10))
     ok('à écrire' not in page.evaluate("document.body.innerText"), '19 novembre, sans Atelier : aucun texte « à écrire » à l\'écran (registre, kō, bandeau)')
-    ok("Pas d'école" not in texte(page, '#reg') and "L'écolier a pris le train" in texte(page, '#reg'), '19 novembre, sans Atelier : le registre garde ses lignes écrites')
+    ok("Pas d'école" not in texte(page, '#reg') and "Le chat" in texte(page, '#reg'), '19 novembre, sans Atelier : le registre garde ses lignes notables écrites (le chat)')
     page.evaluate("document.querySelectorAll('[data-close]').forEach(b => b.click())")
     page.evaluate("document.getElementById('toast').hidden = true")
     page.mouse.click(640, 400); page.clock.run_for(300)
@@ -137,7 +137,8 @@ with captures.serveur() as port, sync_playwright() as p:
     for (d, ecole) in [(3, False), (23, False), (4, True)]:
         ctx, page, err = ouvrir(nav, port, jst(2026, 11, d, 9))
         reg = texte(page, '#reg')
-        ok(("L'écolier a pris le train de 07:48" in reg) == ecole and ("Pas d'école aujourd'hui" in reg) != ecole, f'{d} novembre : écolier {"présent" if ecole else "absent"}')
+        # depuis la session 5 (lot J), le registre ne garde que les faits notables : l'écolier n'y figure que les jours de semaine sans école
+        ok("L'écolier a pris le train" not in reg and ("Pas d'école aujourd'hui" in reg) != ecole, f'{d} novembre : écolier {"présent (routine, pas au registre)" if ecole else "absent (fait notable)"}')
         ctx.close()
     nav.close()
 

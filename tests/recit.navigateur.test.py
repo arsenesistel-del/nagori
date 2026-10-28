@@ -43,7 +43,7 @@ def ouvrir(nav, port, retour, depuis, query='', meteo=None, voyageur=None):
         if 'open-meteo' in url and meteo is not None: return r.fulfill(status=200, content_type='application/json', body=json.dumps(meteo))
         if not url.startswith('http://127.0.0.1'): return r.abort()
         if voyageur is not None and '/data/monde.js' in url:
-            return r.fulfill(status=200, content_type='application/javascript', body=re.sub(r'VOYAGEUR = \{ actif: (true|false),', 'VOYAGEUR = { actif: ' + ('true' if voyageur else 'false') + ',', MONDE))
+            return r.fulfill(status=200, content_type='application/javascript', body=re.sub(r'VOYAGEUR_TEST = \{ actif: (true|false),', 'VOYAGEUR_TEST = { actif: ' + ('true' if voyageur else 'false') + ',', MONDE))
         return r.continue_()
     ctx.route('**/*', route)
     sauve = {'version': 3, 'lastVisit': int(depuis.timestamp() * 1000), 'stamps': [56]}

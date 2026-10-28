@@ -1,20 +1,20 @@
-# Nagori · passation (28 octobre 2026, fin de la session 4)
+# Nagori · passation (fin de la session 5)
 
 Document de reprise pour une nouvelle conversation. Ne duplique pas la bible ni le cahier des charges : il dit où on en est.
 
 ## Sources de vérité, dans cet ordre
 1. `CLAUDE.md` (dépôt) : état technique, règles du projet.
-2. Cahier des charges v3 (projet claude.ai, `claude/Nagori, cahier des charges du prototype de 14 jours.md`) : lots, critères de la partie 9, sessions de la partie 13. Extraits dans le dépôt : `docs/cahier-lots-F-G-H.md`, `docs/cahier-lot-E.md`.
+2. Cahier des charges v3 (projet claude.ai, `claude/Nagori, cahier des charges du prototype de 14 jours.md`) : lots, critères de la partie 9, sessions de la partie 13. Extraits dans le dépôt : `docs/cahier-lots-F-G-H.md`, `docs/cahier-lot-E.md`, `docs/cahier-lots-I-J-K-L.md`.
 3. Bible (`Nagori, bible du projet.docx`) : ne pas la modifier sans Arsène.
 4. Ce fichier : décisions postérieures au cahier.
 
 ## État réel du dépôt
 - Dépôt `arsenesistel-del/nagori`, branche de travail **`session-1`** (poussée). `main` et le site public sont inchangés (`6e05c57`). Ne rien fusionner ni déployer sans accord explicite d'Arsène.
-- Dernier commit de code : « Session 4 : récit de l'absence (lot E), voyageur désactivé par défaut ». Vérifier avec `git log --oneline | head`.
-- Étiquettes `avant-session-1` (sur `6e05c57`), `avant-session-2`, `avant-session-3` (sur `d491c70`), `avant-session-3-cahier` (sur `d37fcd4`), `avant-session-4` (sur `077be75`) : locales seulement, le proxy refuse de les pousser. Non bloquant (validé). Elles disparaissent avec l'espace de travail : en cas de besoin, retrouver les commits par leur message.
-- Tests à lancer avant toute fin de session : `node tests/meteo.test.js` (27), `node tests/objets.test.js` (18), `node tests/vie.test.js` (22), `python3 -I tests/navigateur.test.py` (~3 min), `python3 -I tests/objets.navigateur.test.py` (~4 min), `python3 -I tests/vie.navigateur.test.py` (~2 min), `python3 -I tests/voyageur.navigateur.test.py` (~2 min), `node tests/recit.test.js` (12), `python3 -I tests/recit.navigateur.test.py` (~3 min).
+- Dernier commit de code : « Session 5 : lots J, K, L, performances, voyageur du test ». Vérifier avec `git log --oneline | head`.
+- Étiquettes `avant-session-1` (sur `6e05c57`), `avant-session-2`, `avant-session-3` (sur `d491c70`), `avant-session-3-cahier` (sur `d37fcd4`), `avant-session-4` (sur `077be75`), `avant-session-5` (sur `9c5170e`) : locales seulement, le proxy refuse de les pousser. Non bloquant (validé). Elles disparaissent avec l'espace de travail : en cas de besoin, retrouver les commits par leur message.
+- Tests à lancer avant toute fin de session : `node tests/meteo.test.js` (27), `node tests/objets.test.js` (18), `node tests/vie.test.js` (22), `python3 -I tests/navigateur.test.py` (~3 min), `python3 -I tests/objets.navigateur.test.py` (~4 min), `python3 -I tests/vie.navigateur.test.py` (~2 min), `python3 -I tests/voyageur.navigateur.test.py` (~2 min), `node tests/recit.test.js` (12), `python3 -I tests/recit.navigateur.test.py` (~3 min), `python3 -I tests/mesure.navigateur.test.py`, `python3 -I tests/atelier.navigateur.test.py`, `python3 -I tests/qualite.navigateur.test.py` (~2 min chacun).
 - Session cloud : Python n'a pas Playwright d'office. `pip install playwright==1.63.0 pillow` (la version doit correspondre au Chromium de `/opt/pw-browsers`, sinon « Executable doesn't exist »).
-- Captures de référence : `tests/captures/fin-session-4/` (six états et `traces/`, voyageur désactivé), `tests/captures/avant-session-4/` (voyageur activé) et `tests/captures/fin-session-3-cahier/` (six états et `traces/`, sans le provisoire ; `lots-fgh/` : seize états des lots F, G, H, préfixe `p-` pour le provisoire).
+- Captures de référence : `tests/captures/fin-session-5/` (six états, `traces/`, `lots-fgh/`), `avant-session-5/` (même découpage) ; `fin-session-4/`, `avant-session-4/` (voyageur activé) et `tests/captures/fin-session-3-cahier/` (six états et `traces/`, sans le provisoire ; `lots-fgh/` : seize états des lots F, G, H, préfixe `p-` pour le provisoire).
 
 ## Fait
 - Session 1 (lots A, B) : météo honnête (`js/meteo.js`), point de vue, sauvegarde v3, tests, captures, région.
@@ -77,6 +77,34 @@ Document de reprise pour une nouvelle conversation. Ne duplique pas la bible ni 
   - registre « 5 lignes au plus par jour » (lot J, session 5).
 - Le récit ne s'appuie sur aucun trait provisoire hors cahier.
 
+## Session 5 (lots J, K, L, performances, voyageur du test, ligne « réel et imaginé »)
+
+### Fait et conforme (testé)
+- Lot J : registre limité aux faits notables, 5 lignes au plus par jour (`NAGORI.REGISTRE`, classement NON VALIDÉ), « Revoir » ; « Gestes du jour » et coches retirés, menu « Gestes » replié, gestes toujours faisables au doigt ; l'étagère en bouton principal ; `VOYAGEUR_TEST.actif` (false), un seul voyageur possible (sekki de J9, 25 novembre), ceux des autres sekki et leurs omiyage désactivés ; note des objets trouvés masquée tant que le voyageur est désactivé ; ligne « réel et imaginé » au pied de page (aussi sur téléphone) et dans le carnet ; aucun emplacement « à écrire » sans `?atelier`. Une ligne de registre (à écrire) pour la conséquence d'un objet.
+- Lot K : simulation de date (existante) et d'absence (récit et registre de cette absence) ; revoir chaque type de plan ; graines, tirages et source de la météo ; « Vérifier la météo réelle » (brut et interprétation, trois heures) ; tout remettre à zéro (récit compris) ; forcer une conséquence (aperçu des traces) et un événement de nuit (existants).
+- Lot L : événements du tableau, préfixés par le prénom, une fois par visite (sauf la pose d'un objet) ; rien tant que `COUNTER` est vide ni avec `?atelier`. Le compte GoatCounter reste à créer par Arsène (puis renseigner `COUNTER` dans `js/jeu.js`).
+- Performances : ordinateur 58 à 60 images par seconde ; téléphone émulé, processeur ralenti 4 fois, en régime établi : jour 42,5, pluie 36, nuit sous la neige 31,8 (Chromium sans carte graphique : rendu logiciel, donc mesure pessimiste ; les 3 premières secondes, avant l'adaptation, sont plus lentes). Moyens : tracés regroupés (sans effet visible), densité de pixels adaptative, palier d'économie si l'appareil reste lent.
+- Qualité : 60 s de jeu accéléré sans erreur ; 14 jours sans rien poser, rien de perdu, aucun reproche ; sauvegarde de la session 4 rechargée sans perte.
+- Météo, données réelles (série capturée le 22 octobre à 01 h 18 au Japon, faute de mieux : le terminal n'atteint pas Open-Meteo) :
+
+| Heure (Tokyo) | Open-Meteo brut | Interprétation du jeu |
+| --- | --- | --- |
+| 21 oct. 23:00 | code 53, 7,2 °C, précip. 0,9 mm, neige 0 cm, au sol 0 m, vent 23,6 km/h, nuages 100 % | bruine (drizzle), 7,2 °C, neige au sol 0 cm, vent 23,6 km/h, source réelle |
+| 22 oct. 00:00 | code 51, 5,7 °C, précip. 0,3 mm, neige 0 cm, au sol 0 m, vent 24,7 km/h, nuages 100 % | bruine (drizzle), 5,7 °C, neige au sol 0 cm, vent 24,7 km/h, source réelle |
+| 22 oct. 01:00 | code 51, 4,8 °C, précip. 0,2 mm, neige 0 cm, au sol 0 m, vent 23,4 km/h, nuages 100 % | bruine (drizzle), 4,8 °C, neige au sol 0 cm, vent 23,4 km/h, source réelle |
+
+  Le critère demande trois heures *récentes* : à refaire avec le bouton de l'Atelier, en ligne.
+
+- Captures : par rapport à `avant-session-5`, 12 à 30 % des pixels changent parce que la barre du bas (« Étagère », « Gestes », pied de page) est nouvelle et que la scène se cale sur le haut de cette barre, donc quelques pixels plus bas ; le dessin lui-même est inchangé. `fin-session-5/` est la nouvelle référence.
+
+### Écarts et questions pour Arsène
+- **Poids des scripts et styles** : 270 Ko bruts (cahier : moins de 250 Ko), 96 Ko transférés (gzip). Pour passer sous 250 Ko bruts sans étape de build : sortir le code de l'Atelier et le provisoire hors cahier dans un fichier chargé seulement avec `?atelier` (environ 25 Ko). Non fait : refonte à décider.
+- **« Aucun texte écrit par l'IA visible sans `?atelier` »** : non rempli. Restent visibles des textes écrits en session 1, qui ne sont pas des emplacements « à écrire » : lignes du registre (chat, écolier, vieille dame, cheminot, nouveau kō, objet oublié ; « Depuis ta dernière visite… », « Première visite… », « Les N jours plus anciens sont résumés… », « Rien de nouveau… »), messages des gestes (jardin, quai, gamelle, lampe, « Le chat ronronne. »), notes du carnet, « Tu as rangé… », intitulés de l'étagère, et deux notes en dur dans `index.html` (intro du carnet, « Les lignes du registre sont provisoires… »). Les intitulés fonctionnels (boutons, météo, heures) ne posent pas question. À trancher : valider tels quels, réécrire (6a), ou les passer en « à écrire » (invisibles en jeu normal).
+- **« Aucun compteur… visible »** : le carnet affiche « N/72 » (tampons) et « N voyageur(s) sur 24 » (masqué tant que le voyageur est désactivé). Le critère vise peut-être seulement la boucle des objets (aucun compteur de conséquences, c'est le cas). À trancher.
+- **Série météo enregistrée ou simulée dans l'Atelier** (lot K, facultatif) : non faite.
+- **Lot I (surnaturel)** : non fait, conditionné à « tout le reste fini » ; les deux premiers points ci-dessus restent ouverts.
+- Classement des faits notables du registre (`NAGORI.REGISTRE`) et seuils de performance : NON VALIDÉS.
+
 ## Session 3 : état exact par rapport au cahier (docs/cahier-lots-F-G-H.md)
 
 ### Conforme (comportement conforme à l'extrait, couvert par les tests)
@@ -110,7 +138,7 @@ Document de reprise pour une nouvelle conversation. Ne duplique pas la bible ni 
 - Bible et cahier : la région (« hors de toute gare réelle ») reste à corriger par Arsène.
 
 ## Prochaine action concrète
-Arsène regarde le récit (`?atelier`, « Composer et lire », ou une vraie absence de plus de 3 h) et tranche les interprétations non validées du lot E ; puis la session 5 (lots I, J, K, L), avec l'extrait du cahier dans `docs/`.
+Arsène tranche les écarts de la session 5 (poids, textes de session 1 encore visibles, compteur du carnet), crée le compte GoatCounter, et les interprétations du lot E ; puis la session 6 (intégration des textes, corrections, mise en ligne avec son accord).
 
 ## Pièges connus
 - Le terminal n'atteint pas Open-Meteo ; les séries réelles passent par le navigateur intégré. Les tests naviguent avec Open-Meteo simulé.

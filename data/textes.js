@@ -25,6 +25,9 @@ NAGORI.TEXTES = {
   voyageurAnnonce: 'Voyageur annoncé le {date}, {heure}',
   voyageurProchain: 'Prochain voyageur le {date}, {heure}',
 
+  /* ce qui est réel et ce qui est imaginé (cahier, lot J : formulation proposée par Claude, validée par Arsène), pied de page et carnet */
+  reelImagine: 'Le ciel, le calendrier et la météo sont réels ; la gare, ses horaires et ses habitants sont imaginés.',
+
   sonActif: 'Son',
   sonCoupe: 'Son coupé',
 
@@ -100,6 +103,9 @@ NAGORI.TEXTES = {
     'givre-banc': '(texte à écrire : le givre sur le banc et les rails)'
   },
   objetRange: 'Tu as rangé {objet} aux objets trouvés.',
+  /* registre : la conséquence d'un objet, le jour où sa fenêtre se ferme (emplacements à écrire, invisibles en jeu normal) */
+  registreObjet: { thermos: '(texte à écrire : registre, le thermos)', parapluie: '(texte à écrire : registre, le parapluie)',
+                   lumiere: '(texte à écrire : registre, la lumière laissée allumée)', retour: '(texte à écrire : registre, le parapluie rendu)' },
 
   /* lots F, G, H (cahier des charges) : emplacements à écrire par Arsène, montrés seulement avec ?atelier.
      Le japonais (avisTitre, avisDate, ardoise, cahierJp) est PROVISOIRE, non validé : à relire par une personne compétente. */

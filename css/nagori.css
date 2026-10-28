@@ -114,8 +114,9 @@ button:disabled{opacity:.45;cursor:default}
   .gestures::-webkit-scrollbar,.actions::-webkit-scrollbar{display:none}
   button{padding:0 12px;min-height:40px;font-size:13px;white-space:nowrap;flex:none}
   button.chip{min-height:36px;font-size:12px;padding:0 11px}
-  .foot{display:none}
-  .gestures .label{display:none}
+  .foot{font-size:10px;line-height:1.3}
+  .foot .reste{display:none}
+  .gestures .gestes-menu{flex-wrap:nowrap}
   .slot{display:none}
 }
 }
@@ -143,3 +144,9 @@ body.en-recit .hud{opacity:0;pointer-events:none;transition:opacity .4s}
 .recit-ko[hidden]{display:none}
 .recit-ko .kanji{font-family:"Shippori Mincho",serif;font-size:clamp(40px,9vw,88px);letter-spacing:.08em}
 .recit-ko .kana{margin-top:8px;font-size:clamp(14px,2.4vw,20px);opacity:.8;letter-spacing:.1em}
+/* le menu « Gestes », replié (lot J) */
+.gestes-menu{display:flex;flex-wrap:wrap;gap:8px}
+.gestes-menu[hidden]{display:none}
+/* Atelier : vérification de la météo réelle */
+.verif{border-collapse:collapse;font-size:11px;margin:6px 0}
+.verif td,.verif th{border:1px solid var(--line);padding:3px 5px;text-align:left;vertical-align:top}

@@ -39,7 +39,11 @@ const WX_PARAMS = {
 };
 /* le voyageur du sekki : réglage du jeu (data/monde.js), que l'Atelier peut remplacer le temps d'un essai, sans rien enregistrer */
 let voyageurEssai = null;
-const voyageurActif = () => voyageurEssai != null ? voyageurEssai : N.VOYAGEUR.actif !== false;
+const voyageurActif = () => voyageurEssai != null ? voyageurEssai : N.VOYAGEUR_TEST.actif === true;
+/* le seul voyageur possible : celui du sekki qui contient le jour du test (VOYAGEUR_TEST.j) ; clé = début du sekki */
+let cleTest = null;
+const cleVoyageurTest = () => { if (!cleTest){ const d = VIE.dateDuJour(FERM, N.VOYAGEUR_TEST.j); cleTest = seasonOf(d.y, d.m, d.d).key; } return cleTest; };
+const voyageurPour = cle => voyageurActif() && cle === cleVoyageurTest();
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* ---------- Sauvegarde locale ---------- */
@@ -54,22 +58,35 @@ const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(save)); }
 /* le récit de l'absence en cours de lecture (lot E), ou null */
 let lecture = null;
 
-/* ---------- Test de six semaines : compteur de visites ----------
-   Chaque testeur reçoit un lien personnel (?t=prenom), mémorisé dans son navigateur.
-   GoatCounter (gratuit, sans cookie) note une visite sur le chemin /t/prenom.
-   Rien n'est compté tant que COUNTER est vide, ni avec ?atelier (visites d'Arsène). */
+/* ---------- Test de six semaines : mesure (cahier, lot L) ----------
+   Chaque testeur reçoit un lien personnel (?t=prenom), mémorisé dans son navigateur. GoatCounter (gratuit, sans cookie de notre part)
+   note une visite sur /t/prenom et des événements anonymes, préfixés par le prénom (prenom/visite-h21…).
+   Rien n'est compté tant que COUNTER est vide (compte à créer par Arsène), ni jamais avec ?atelier (visites d'Arsène).
+   Chaque événement compte une fois par visite, sauf la pose d'un objet. */
 const COUNTER = '';
-(() => {
-  const q = new URLSearchParams(location.search);
-  if (q.has('atelier')) return;
+const MESURE = (() => {
+  const q = new URLSearchParams(location.search), rien = { compter(){}, actif: false };
+  if (q.has('atelier')) return rien;
   let who = (q.get('t') || '').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 24);
   try { if (who) localStorage.setItem('nagori-testeur', who); else who = localStorage.getItem('nagori-testeur') || ''; } catch (e) {}
-  if (!COUNTER) return;
+  if (!COUNTER) return rien;
+  const prefixe = who || 'sans-lien', file = [], deja = new Set();
   window.goatcounter = { path: who ? `/t/${who}` : '/sans-lien' };
+  const envoyer = nom => { try { window.goatcounter.count({ path: `${prefixe}/${nom}`, title: nom, event: true }); } catch (e) {} };
   const s = document.createElement('script');
   s.async = true; s.src = 'https://gc.zgo.at/count.js'; s.dataset.goatcounter = `https://${COUNTER}.goatcounter.com/count`;
+  s.onload = () => { while (file.length) envoyer(file.shift()); };
   document.head.appendChild(s);
+  function compter(nom, chaqueFois = false){
+    if (!chaqueFois){ if (deja.has(nom)) return; deja.add(nom); }
+    if (window.goatcounter && typeof window.goatcounter.count === 'function') envoyer(nom); else file.push(nom);
+  }
+  return { compter, actif: true, prefixe };
 })();
+const compter = (nom, chaqueFois) => MESURE.compter(nom, chaqueFois);
+/* un geste du joueur dans la gare (pour « séjour sans action ») */
+let aAgi = false;
+const agir = () => { aAgi = true; };
 
 /* ---------- Temps ---------- */
 const fmt = new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
@@ -185,6 +202,17 @@ const DEBRIS = [[236,182,196],[78,112,62],[188,92,44],[230,234,240]];
 const cv = $('#scene'), ctx = cv.getContext('2d');
 let W=0,H=0,DPR=1, S=1, OX=0, OY=0, uiTop=0;
 const VW=1600, VH=900;
+/* performances : si les images ralentissent (moins de 40 par seconde sur 3 s), la densité de pixels baisse par paliers jusqu'à 1 ;
+   si c'est encore lent à 1 (moins de 32), le palier d'économie s'active. On ne remonte pas pendant la visite. */
+let dprMax = 2, perfT = 0, perfN = 0, qualite = 1;   /* qualite : 1, ou .5 en économie (moitié moins de gouttes et de flocons, 3 nappes de brouillard) */
+function surveillerPerf(dt){
+  perfT += dt; perfN++;
+  if (perfT < 3) return;
+  const fps = perfN / perfT; perfT = 0; perfN = 0;
+  if (document.visibilityState !== 'visible') return;
+  if (fps < 40 && DPR > 1){ dprMax = Math.max(1, DPR - .5); resize(); }
+  else if (fps < 32 && DPR <= 1) qualite = .5;
+}
 const cam = { pan:0, vel:0, drag:null, justDragged:false };
 function layoutCam(){
   if (lecture && lecture.plan.cadrage){
@@ -204,7 +232,7 @@ function layoutCam(){
   OY = (uiTop - 10) - 772*S;
 }
 function resize(){
-  DPR = Math.min(2, window.devicePixelRatio||1);
+  DPR = Math.min(2, dprMax, window.devicePixelRatio||1);
   W = cv.clientWidth; H = cv.clientHeight;
   cv.width = Math.round(W*DPR); cv.height = Math.round(H*DPR);
   const ges = document.querySelector('.gestures');
@@ -277,7 +305,12 @@ function drawScene(w, info){
   g.addColorStop(0, rgb(top)); g.addColorStop(1, rgb(bot));
   ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
   const starA = clamp(-e*1.6,0,1) * (1-wx.cloud) * (1 - .55*luneHaute);
-  if (starA > .01){ for (const s of STARS){ ctx.fillStyle = `rgba(240,238,225,${starA*(.55+.45*Math.sin(clock*1.3+s.tw))})`; ctx.beginPath(); ctx.arc(s.x*W, s.y*horizonY, s.r, 0, 7); ctx.fill(); } }
+  if (starA > .01){
+    /* performances : les étoiles par 8 niveaux d'éclat, un tracé par niveau */
+    const niveaux = Array.from({length: 8}, () => []);
+    for (const s of STARS) niveaux[Math.min(7, Math.floor((.5+.5*Math.sin(clock*1.3+s.tw))*8))].push(s);
+    niveaux.forEach((l, i) => { if (!l.length) return; ctx.fillStyle = `rgba(240,238,225,${starA*(.55+.45*((i+.5)/8*2-1))})`; ctx.beginPath(); for (const s of l){ ctx.moveTo(s.x*W + s.r, s.y*horizonY); ctx.arc(s.x*W, s.y*horizonY, s.r, 0, 7); } ctx.fill(); });
+  }
   if (info.sun.t != null && wx.cloud < .85){
     const sx = W*(.12+.76*info.sun.t), sy = horizonY - Math.max(0,e)*horizonY*.82;
     const sg = ctx.createRadialGradient(sx,sy,0,sx,sy,120*S+40);
@@ -337,8 +370,9 @@ function drawScene(w, info){
     for (let i=0;i<9;i++){ const ww = 10+Math.sin(clock*2+i)*6+i*2; ctx.fillRect(rx-ww/2 + Math.sin(clock+i)*4, 556+i*10, ww, 2.2); }
   }
   ctx.fillStyle = col(snowy ? [196,204,214] : TREES[season], .3+.7*L); ctx.fillRect(-300,546,2200,8);
-  for (const t of TREELINE){ ctx.beginPath(); ctx.arc(t.x, 548, t.r, Math.PI, 0); ctx.fill(); }
-  if (snowy){ ctx.fillStyle = col(C.snow, .35+.65*L, .7*snowCover); for (const t of TREELINE){ ctx.beginPath(); ctx.ellipse(t.x, 548-t.r*.8, t.r*.7, t.r*.3, 0, Math.PI, 0); ctx.fill(); } }
+  /* performances : un seul tracé pour toute la ligne d'arbres, un pour leurs chapeaux de neige */
+  ctx.beginPath(); for (const t of TREELINE){ ctx.moveTo(t.x - t.r, 548); ctx.arc(t.x, 548, t.r, Math.PI, 0); } ctx.fill();
+  if (snowy){ ctx.fillStyle = col(C.snow, .35+.65*L, .7*snowCover); ctx.beginPath(); for (const t of TREELINE){ ctx.moveTo(t.x - t.r*.7, 548-t.r*.8); ctx.ellipse(t.x, 548-t.r*.8, t.r*.7, t.r*.3, 0, Math.PI, 0); } ctx.fill(); }
   drawFerme(L, info.nuit.ferme, snowy);
   if (info.flies){ for (const f of FLIES){ const a = Math.max(0, Math.sin(clock*f.sp*2+f.ph)); const x = f.x + Math.sin(clock*.3+f.ph)*12, y = f.y + Math.cos(clock*.4+f.ph)*6; glow(x, y, 9, '214,255,140', .9*a); } }
   if (wx.rain > .2){ if (Math.random() < wx.rain*.7) ripples.push({x:Math.random()*2000-200, y:560+Math.random()*80, t:0}); ctx.strokeStyle = 'rgba(220,228,240,.25)'; ctx.lineWidth=1; ripples = ripples.filter(r=>{ r.t += .016; ctx.globalAlpha = Math.max(0,1-r.t*1.4); ctx.beginPath(); ctx.ellipse(r.x,r.y,4+r.t*22,1+r.t*5,0,0,7); ctx.stroke(); return r.t < .75; }); ctx.globalAlpha = 1; }
@@ -412,21 +446,21 @@ function drawScene(w, info){
   if (purr){ purr.t += .016; ctx.fillStyle = `rgba(241,201,124,${1-purr.t})`; for (let i=0;i<3;i++){ const px = purr.x + i*10 - 10, py = purr.y - 20 - purr.t*30 - i*6; ctx.beginPath(); ctx.arc(px-2,py,2.6,0,7); ctx.arc(px+2,py,2.6,0,7); ctx.moveTo(px-4.6,py+1); ctx.lineTo(px,py+6); ctx.lineTo(px+4.6,py+1); ctx.fill(); } if (purr.t>1) purr = null; }
   if (wx.fog > .05){
     const fc = mix(bot,[230,232,236],.35);
-    for (let i=0;i<5;i++){ const y = 470+i*55, x = ((clock*(6+i*2) + i*400) % 2600) - 700; const fg = ctx.createRadialGradient(x+500,y,0,x+500,y,700); fg.addColorStop(0, rgb(fc, .42*wx.fog)); fg.addColorStop(1, rgb(fc,0)); ctx.fillStyle = fg; ctx.fillRect(x-200,y-120,1400,240); }
+    for (let i=0;i<(qualite < 1 ? 3 : 5);i++){ const y = 470+i*55, x = ((clock*(6+i*2) + i*400) % 2600) - 700; const fg = ctx.createRadialGradient(x+500,y,0,x+500,y,700); fg.addColorStop(0, rgb(fc, .42*wx.fog)); fg.addColorStop(1, rgb(fc,0)); ctx.fillStyle = fg; ctx.fillRect(x-200,y-120,1400,240); }
   }
 
   /* ---- écran : pluie, neige, éclairs, vignette */
   ctx.setTransform(DPR,0,0,DPR,0,0);
   if (wx.rain > .02){
-    const n = Math.floor(RAIN.length*Math.min(1,wx.rain)*(reduceMotion?.4:1));
+    const n = Math.floor(RAIN.length*Math.min(1,wx.rain)*(reduceMotion?.4:1)*qualite);
     ctx.strokeStyle = rgb(mix(bot,[220,228,240],.6), .35); ctx.lineWidth = 1; ctx.beginPath();
     for (let i=0;i<n;i++){ const r = RAIN[i]; r.y += r.v*.032*(1+wx.storm*.5); if (r.y>1.05){ r.y=-.05; r.x=Math.random(); } const x=r.x*W, y=r.y*H; ctx.moveTo(x,y); ctx.lineTo(x-(4+wind*16)*r.l, y+22*r.l); }
     ctx.stroke();
   }
   if (wx.snow > .02){
-    const n = Math.floor(SNOW.length*Math.min(1,wx.snow)*(reduceMotion?.4:1));
+    const n = Math.floor(SNOW.length*Math.min(1,wx.snow)*(reduceMotion?.4:1)*qualite);
     ctx.fillStyle = 'rgba(246,248,252,.85)';
-    for (let i=0;i<n;i++){ const s = SNOW[i]; s.y += s.v*.004; if (s.y>1.02){ s.y=-.02; s.x=Math.random(); } s.x -= wind*.0012; if (s.x < -.02) s.x = 1.02; ctx.beginPath(); ctx.arc((s.x + Math.sin(clock*.6+s.ph)*.01)*W, s.y*H, s.r, 0, 7); ctx.fill(); }
+    ctx.beginPath(); for (let i=0;i<n;i++){ const s = SNOW[i]; s.y += s.v*.004; if (s.y>1.02){ s.y=-.02; s.x=Math.random(); } s.x -= wind*.0012; if (s.x < -.02) s.x = 1.02; const fx = (s.x + Math.sin(clock*.6+s.ph)*.01)*W; ctx.moveTo(fx + s.r, s.y*H); ctx.arc(fx, s.y*H, s.r, 0, 7); } ctx.fill();   // un seul tracé pour tous les flocons
   }
   if (wx.storm > .5 && Math.random() < .004){ if (!reduceMotion) flash = .5; son.event('thunder', {delay: .8 + Math.random()*2.5}); }
   if (flash > 0){ ctx.fillStyle = `rgba(230,236,255,${flash})`; ctx.fillRect(0,0,W,H); flash -= .03; }
@@ -519,7 +553,7 @@ function etiquette(quoi){
 }
 function etiquetteEn(x, y, k){ ctx.fillStyle = col([250,250,244], k); ctx.fillRect(x, y, 5, 3.4); ctx.fillStyle = col([60,60,70], k); ctx.fillRect(x+1, y+1.4, 3, .6); }
 /* les omiyage sur la façade : seulement si le voyageur est activé (ils restent dans la sauvegarde sinon) */
-function hasGift(i){ return voyageurActif() && (save.preview || Object.values(save.gifts).includes(i)); }
+function hasGift(i){ return voyageurActif() && (save.preview || save.gifts[cleVoyageurTest()] === i); }
 
 /* le bâtiment : salle d'attente en bois, toit de tôle rouge comme à Hokkaidō, poêle l'hiver */
 function drawStation(L, night, snowy, info, temp, wind){
@@ -1127,7 +1161,7 @@ function figure(p, y, L, night){
 function drawTufts(L, season, snowy, wind){
   const c = snowy ? [180,190,200] : season===2 ? [168,140,90] : season===3 ? [130,130,120] : [70,110,64];
   ctx.strokeStyle = col(c, .25+.6*L, snowy ? .5 : .9); ctx.lineWidth = 1.4;
-  for (const t of GRASS_TUFTS){ const sw = Math.sin(clock*1.2 + t.s*6)*(1+wind*3); ctx.beginPath(); for (const d of [-3,0,3]){ ctx.moveTo(t.x+d, t.y); ctx.quadraticCurveTo(t.x+d+sw*.5, t.y-t.h*.6, t.x+d*1.6+sw, t.y-t.h); } ctx.stroke(); }
+  ctx.beginPath(); for (const t of GRASS_TUFTS){ const sw = Math.sin(clock*1.2 + t.s*6)*(1+wind*3); for (const d of [-3,0,3]){ ctx.moveTo(t.x+d, t.y); ctx.quadraticCurveTo(t.x+d+sw*.5, t.y-t.h*.6, t.x+d*1.6+sw, t.y-t.h); } } ctx.stroke();   // un seul tracé pour toutes les touffes
   if (season===2 && !snowy){ ctx.fillStyle = col([220,206,170], .3+.6*L, .9); for (const t of GRASS_TUFTS) if (t.s > .7){ const sw = Math.sin(clock*1.2 + t.s*6)*(1+wind*3); ctx.beginPath(); ctx.ellipse(t.x+sw*1.3, t.y-t.h-4, 2, 6, .3, 0, 7); ctx.fill(); } }
 }
 /* le jardin, au premier plan devant la lampe */
@@ -1196,7 +1230,7 @@ function travelerState(w){
   const welcomed = save.gifts[tv.key] != null;
   const arrived = save.arrived[tv.key] || idx(w.y,w.m,w.d,w.hour) >= tv.at;
   const fermee = prov() && VIE.fermeture(FERM, w.y,w.m,w.d,w.hour).prov.fermee;      // provisoire, hors cahier : plus de voyageur une fois la gare fermée
-  const off = !voyageurActif();
+  const off = !voyageurPour(tv.key);
   return { s, tv, welcomed, fermee, off, waiting: arrived && !welcomed && !fermee && !off };
 }
 function updateTraveler(dt){
@@ -1233,23 +1267,32 @@ function computeInfo(w){
 }
 
 /* ---------- Registre ---------- */
+/* les lignes du registre d'un jour : [heure, texte, mise en avant, sorte]. Seulement les faits notables, 5 lignes au plus par jour
+   (cahier, lot J) ; le choix suit NAGORI.REGISTRE (data/monde.js), puis l'ordre du temps. */
 function eventsOfDay(y,m,d){
   const R = T.registre, ev = [], school = jourDecole(y,m,d), p = dayPlan(y,m,d);
-  const prev = addDays(y,m,d,-1), s = seasonOf(y,m,d);
-  if (seasonOf(prev.y,prev.m,prev.d).ko !== s.ko) ev.push([0.01, tx(R.nouveauKo, {ko: koName(s.ko), sens: KO[s.ko][3].toLowerCase()}), true]);
-  for (const c of p.cat) ev.push([c.from, c.spot==='roof' ? R.chatToit : R.chatBanc]);
-  ev.push([7.8, school ? R.ecolierMatin : R.ecolierAbsent]);
-  ev.push([10.6, R.cheminotMatin]);
-  { const mv = prov() ? magasin.a(jstMs(y,m,d,13)) : null; if (!mv || mv.source !== 'reelle' || VIE.vieilleVient(RG, mv)) ev.push([13.5, R.vieilleDame]); }
-  if (school) ev.push([16.36, R.ecolierRetour]);
+  const prev = addDays(y,m,d,-1), s = seasonOf(y,m,d), semaine = [1,2,3,4,5].includes(new Date(Date.UTC(y,m-1,d)).getUTCDay());
+  if (seasonOf(prev.y,prev.m,prev.d).ko !== s.ko) ev.push([0.01, tx(R.nouveauKo, {ko: koName(s.ko), sens: KO[s.ko][3].toLowerCase()}), true, 'ko']);
+  for (const c of p.cat) ev.push([c.from, c.spot==='roof' ? R.chatToit : R.chatBanc, false, 'chat']);
+  ev.push([7.8, school ? R.ecolierMatin : R.ecolierAbsent, false, school ? 'routine' : semaine ? 'absence' : 'routine']);
+  ev.push([10.6, R.cheminotMatin, false, 'routine']);
+  { const mv = prov() ? magasin.a(jstMs(y,m,d,13)) : null; if (!mv || mv.source !== 'reelle' || VIE.vieilleVient(RG, mv)) ev.push([13.5, R.vieilleDame, false, 'vieille']); }
+  if (school) ev.push([16.36, R.ecolierRetour, false, 'routine']);
   const tv = travelerOf(s);
-  if (voyageurActif() && dayKey(tv.day.y,tv.day.m,tv.day.d) === dayKey(y,m,d)) ev.push([tv.h + .03, R.voyageur, true]);
-  if (p.item) ev.push([p.item.h, tx(R.objet, {objet: ITEMS[p.item.idx]}), true]);
-  ev.push([21.6, R.cheminotSoir]);
+  if (voyageurPour(tv.key) && dayKey(tv.day.y,tv.day.m,tv.day.d) === dayKey(y,m,d)) ev.push([tv.h + .03, R.voyageur, true, 'voyageur']);
+  if (p.item) ev.push([p.item.h, tx(R.objet, {objet: ITEMS[p.item.idx]}), true, 'oubli']);
+  ev.push([21.6, R.cheminotSoir, false, 'routine']);
   /* la fermeture : chaque changement a sa ligne, le jour où il arrive (data/fermeture.js) */
   const F = VIE.fermeture(FERM, y,m,d, 0);
-  for (const id of F.aujourdhui){ const c = FERM.changements.find(x => x.id === id); ev.push([c.h + .01, TF.registre[id], true]); }
-  return ev.filter(e => montrable(e[1])).sort((a,b)=>a[0]-b[0]);
+  for (const id of F.aujourdhui){ const c = FERM.changements.find(x => x.id === id); ev.push([c.h + .01, TF.registre[id], true, 'fermeture']); }
+  /* la conséquence d'un objet (et le parapluie rendu), le jour où sa fenêtre se ferme : ligne à écrire */
+  const o = save.objets, jour = dayKey(y,m,d), le = ms => { const t = tokyoAt(ms); return dayKey(t.y,t.m,t.d) === jour ? t.h : null; };
+  if (o.trace && o.trace.fin != null && le(o.trace.fin) != null) ev.push([le(o.trace.fin), T.registreObjet[o.trace.type], true, 'objet']);
+  if (o.retourTrace && le(o.retourTrace.ms) != null) ev.push([le(o.retourTrace.ms), T.registreObjet.retour, true, 'objet']);
+  const RG2 = N.REGISTRE, rang = e => RG2.priorite[e[3]] || 0;
+  let l = ev.filter(e => montrable(e[1]) && rang(e) >= RG2.seuil);
+  if (l.length > RG2.maxParJour) l = l.sort((a,b) => rang(b) - rang(a) || a[0] - b[0]).slice(0, RG2.maxParJour);
+  return l.sort((a,b)=>a[0]-b[0]);
 }
 function renderRegistre(fromMs){
   const now = Date.now(), first = !fromMs;
@@ -1302,9 +1345,10 @@ function renderBook(currentKo){
   $('#book-count').textContent = `${save.stamps.length}/72`;
   $('#moments').innerHTML = MOMENTS.map(m => { const on = save.moments.includes(m.id); return `<div class="mom r-${m.rar} ${on?'on':''}"><span>${on ? m.name : '· · ·'}</span><em>${m.rar}</em></div>`; }).join('');
   $('#gifts-titre').hidden = $('#gifts').hidden = !voyageurActif();
-  const got = voyageurActif() ? Object.entries(save.gifts) : [];
+  const got = Object.entries(save.gifts).filter(([k]) => voyageurPour(k));
   $('#gifts').innerHTML = got.length ? got.map(([k,g]) => { const [y,m,d] = k.split('-').map(Number); const s = SEKKI[seasonOf(y,m,d).i]; return `<div class="mom on"><span>${tx(T.carnetVoyageur, {sekki: s[1], cadeau: GIFTS[g]})}</span><em>${s[0]}</em></div>`; }).join('') + `<div class="note">${tx(T.carnetVoyageurs, {n: got.length, s: got.length>1?'s':''})}</div>` : `<div class="note">${T.carnetAucunVoyageur}</div>`;
-  $('#found').innerHTML = save.found.length ? save.found.map(f => `<div class="mom on"><span>${ITEMS[f.idx]}</span><em>${frDate(...f.key.split('-').map(Number))}</em></div>`).join('') : `<div class="note">${T.carnetAucunObjet}</div>`;
+  /* la note des objets trouvés parle des voyageurs : masquée tant que le voyageur du test est désactivé */
+  $('#found').innerHTML = save.found.length ? save.found.map(f => `<div class="mom on"><span>${ITEMS[f.idx]}</span><em>${frDate(...f.key.split('-').map(Number))}</em></div>`).join('') : voyageurActif() ? `<div class="note">${T.carnetAucunObjet}</div>` : '';
 }
 
 function showTraveler(){
@@ -1332,10 +1376,13 @@ $('#tr-later').addEventListener('click', () => { $('#traveler').hidden = true; }
 
 /* gestes */
 function today(){ const w = worldTime(); return dayKey(w.y,w.m,w.d); }
-function gWater(){ const w = worldTime(); water = {t:0}; son.event('water'); if (save.watered === today() && !w.simulated){ toast(T.jardinDejaArrose); return; } save.watered = today(); save.growth = Math.min(14, save.growth+1); persist(); toast(save.growth >= 14 ? T.jardinPlein : T.jardinArrose); }
-function gSweep(){ if (sweep) return; const info = computeInfo(worldTime()); if (info.debris < .05){ toast(T.quaiPropre); return; } sweep = {t:0}; son.event('sweep'); }
-function gFeed(){ const w = worldTime(); if (save.fed === today()){ toast(T.gamelleDejaPleine); return; } save.fed = today(); save.fedHour = w.hour; persist(); son.event('feed'); toast(T.gamelleRemplie); }
-function gLamp(){ const w = worldTime(), info = computeInfo(w); if (info.sun.e >= .08){ toast(T.lampeTropTot); return; } if (save.lamp === nightKey(w)){ toast(T.lampeDejaAllumee); return; } save.lamp = nightKey(w); persist(); son.event('lamp'); toast(T.lampeAllumee); }
+function gWater(){ agir(); const w = worldTime(); water = {t:0}; son.event('water'); if (save.watered === today() && !w.simulated){ toast(T.jardinDejaArrose); return; } save.watered = today(); save.growth = Math.min(14, save.growth+1); persist(); toast(save.growth >= 14 ? T.jardinPlein : T.jardinArrose); }
+function gSweep(){ agir(); if (sweep) return; const info = computeInfo(worldTime()); if (info.debris < .05){ toast(T.quaiPropre); return; } sweep = {t:0}; son.event('sweep'); }
+function gFeed(){ agir(); const w = worldTime(); if (save.fed === today()){ toast(T.gamelleDejaPleine); return; } save.fed = today(); save.fedHour = w.hour; persist(); son.event('feed'); toast(T.gamelleRemplie); }
+function gLamp(){ agir(); const w = worldTime(), info = computeInfo(w); if (info.sun.e >= .08){ toast(T.lampeTropTot); return; } if (save.lamp === nightKey(w)){ toast(T.lampeDejaAllumee); return; } save.lamp = nightKey(w); persist(); son.event('lamp'); toast(T.lampeAllumee); }
+/* le menu « Gestes », replié ; l'étagère, action principale (cahier, lot J) */
+$('#btn-gestes').addEventListener('click', () => { const m = $('#gestes-menu'); m.hidden = !m.hidden; $('#btn-gestes').setAttribute('aria-expanded', String(!m.hidden)); });
+$('#btn-etagere').addEventListener('click', () => ouvrirEtagere());
 $('#g-water').addEventListener('click', gWater); $('#g-sweep').addEventListener('click', gSweep); $('#g-feed').addEventListener('click', gFeed); $('#g-lamp').addEventListener('click', gLamp);
 
 /* clics dans la scène */
@@ -1418,6 +1465,10 @@ cv.addEventListener('click', ev => {
   if (lecture || performance.now() - finRecit < 600) return;
   const hit = sceneHit(ev); if (!hit) return;
   const info = computeInfo(worldTime());
+  agir();
+  if (hit.startsWith('trace:')) compter('trace-touchee');
+  else if (hit === 'f:avis') compter('avis-touche');
+  else if (hit.startsWith('hab:')) compter('habitue-touche');
   if (hit==='cat'){ const [cx,cy] = CAT_POS[info.cat]; purr = {x:cx, y:cy-6, t:0}; son.event('purr'); toast(info.cat === 'salle' ? TP.chatSalle : T.chatRonronne); }
   else if (hit.startsWith('hab:')){                // deux lignes qui alternent ; le jour de son moment, la ligne du moment
     const kind = hit.slice(4), qui = { kid: 'ecolier', lady: 'vieille', worker: 'cheminot' }[kind], p = info.people.find(q => q.kind === kind);
@@ -1470,7 +1521,8 @@ function renderEtagere(){
     else b.textContent = E.poser;
     b.addEventListener('click', () => {
       if (estPose){ OBJ.reprendre(o); toast(tx(E.repriseToast, { objet: E.objets[type] })); }
-      else if (OBJ.poser(o, type, Date.now()).ok) toast(tx(E.poseToast, { objet: E.objets[type] }));
+      else if (OBJ.poser(o, type, Date.now()).ok){ toast(tx(E.poseToast, { objet: E.objets[type] })); compter('objet-' + type, true); }
+      agir();
       persist(); objetsTick(); renderEtagere();
     });
     ligne.append(nom, b); liste.appendChild(ligne);
@@ -1485,6 +1537,7 @@ function ouvrirEtagere(){ renderEtagere(); $('#etagere').hidden = false; }
 function entreesCahier(F){ return FERM.changements.filter(c => c.id.startsWith('cahier-') && F.faits.includes(c.id) && montrable(TF.cahierEntrees[c.id])); }
 const cahierLisible = () => { const w = worldTime(); return AVEC_ATELIER || entreesCahier(VIE.fermeture(FERM, w.y,w.m,w.d,w.hour)).length > 0; };
 function ouvrirCahier(){
+  compter('cahier-ouvert');
   const w = worldTime(), F = VIE.fermeture(FERM, w.y,w.m,w.d,w.hour);
   const entrees = entreesCahier(F);
   $('#ca-titre').textContent = `${TF.cahierJp} · ${TF.cahierTitre}`;
@@ -1501,7 +1554,7 @@ $('#et-fermer').addEventListener('click', () => { $('#etagere').hidden = true; }
 const H3 = 3600e3;
 function ctxRecit(de, a){
   const arrivees = [];
-  if (voyageurActif()) for (const j of RECIT.jours(de, a)){ const tv = travelerOf(seasonOf(j.y, j.m, j.d)); if (tv.day.y === j.y && tv.day.m === j.m && tv.day.d === j.d) arrivees.push(jstMs(j.y, j.m, j.d, tv.h)); }
+  if (voyageurActif()) for (const j of RECIT.jours(de, a)){ const tv = travelerOf(seasonOf(j.y, j.m, j.d)); if (voyageurPour(tv.key) && tv.day.y === j.y && tv.day.m === j.m && tv.day.d === j.d) arrivees.push(jstMs(j.y, j.m, j.d, tv.h)); }
   const e = clientMeteo.etat;
   return { de, a, meteo: magasin, horsLigne: !navigator.onLine || e.echecs > 0 || e.dernierSucces == null,
     sunElev: elevGare, koDuJour: (y,m,d) => seasonOf(y,m,d).ko, vie: VIE, NUIT, FERM, jourDecole: ms => OBJ.jourDecole(POSES, ms),
@@ -1537,7 +1590,7 @@ function planSuivant(){
   const ko = $('#recit-ko'); ko.hidden = p.type !== 'ko';
   if (p.type === 'ko'){ $('#recit-ko-kanji').textContent = KO[p.ko][0]; $('#recit-ko-kana').textContent = KO[p.ko][1]; }
 }
-function avancerRecit(dt){ const L = lecture; L.t += dt; L.cloche = Math.max(0, L.cloche - dt); if (L.t >= L.parPlanS) planSuivant(); }
+function avancerRecit(dt){ const L = lecture; L.t += dt; L.cloche = Math.max(0, L.cloche - dt); if (L.t >= L.parPlanS){ if (L.i === L.plans.length - 1 && !L.simule) compter('recit-vu'); planSuivant(); } }
 function finirRecit(){
   if (!lecture) return;
   Object.assign(train, lecture.train); cam.pan = lecture.pan;
@@ -1556,12 +1609,13 @@ function dessinFondu(){
 }
 let finRecit = -1e9;
 /* passer le récit : un toucher, ou une touche */
-addEventListener('pointerdown', ev => { if (lecture){ ev.stopPropagation(); finirRecit(); } }, true);
-addEventListener('keydown', ev => { if (lecture){ finirRecit(); } }, true);
+addEventListener('pointerdown', ev => { if (lecture){ ev.stopPropagation(); if (!lecture.simule) compter('recit-passe'); finirRecit(); } }, true);
+addEventListener('keydown', ev => { if (lecture){ if (!lecture.simule) compter('recit-passe'); finirRecit(); } }, true);
 
 /* la vignette « Pendant ton absence » : elle s'efface au premier geste ou après 30 s ; le récit reste dans le registre (Revoir) */
 const vignette = $('#vignette'); let vignetteTimer = null;
 function montrerVignette(r){
+  compter('recit-propose');
   vignette.textContent = `${TR.vignette} · ${tx(TR.duree, {s: Math.round(r.dureeS)})}`;
   vignette.hidden = false; clearTimeout(vignetteTimer); vignetteTimer = setTimeout(cacherVignette, RR.vignetteS*1000);
   addEventListener('pointerdown', ev => { if (ev.target !== vignette) cacherVignette(); }, { once: true, capture: true });
@@ -1604,6 +1658,7 @@ $('#btn-lab').addEventListener('click', () => { lab.hidden = !lab.hidden; book.h
 $('#btn-reg').addEventListener('click', () => { if (reg.hidden) openRegistre(save.prevVisit || save.lastVisit); else reg.hidden = true; });
 $('#reg-stamp').addEventListener('click', () => { reg.hidden = true; son.event('stamp'); toast(T.registreTamponne); });
 $('#reg-revoir').textContent = TR.revoir;
+$('#reel-imagine').textContent = T.reelImagine; $('#book-reel').textContent = T.reelImagine;
 $('#reg-revoir').addEventListener('click', () => { if (save.recit.dernier) lancerRecit(save.recit.dernier); });
 document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => { document.getElementById(b.dataset.close).hidden = true; }));
 addEventListener('keydown', ev => { if (ev.key === 'Escape'){ book.hidden = true; lab.hidden = true; reg.hidden = true; } });
@@ -1629,6 +1684,28 @@ $('#lab-traveler').addEventListener('click', () => {
 });
 $('#lab-away').addEventListener('click', () => { openRegistre(Date.now() - 15*36e5); });
 /* récit d'une absence simulée : la météo réelle connue de ces heures, rien n'est enregistré (ni historique, ni « vu ») */
+$('#lab-recit-registre').addEventListener('click', () => { openRegistre(Date.now() - (+$('#lab-absence').value)*H3); });
+/* revoir un type de plan : le meilleur plan de ce type dans les 9 derniers jours, seul, sans rien enregistrer */
+$('#lab-plan').addEventListener('change', ev => {
+  const type = ev.target.value; ev.target.value = ''; if (!type) return;
+  const a = Date.now(), c = RECIT.candidats(RR, ctxRecit(a - 216*H3, a)).filter(p => p.type === type && p.sous !== 'jour');
+  if (!c.length){ toast('Aucun plan de ce type dans les 9 derniers jours (météo réelle connue, calendrier, réglages).'); return; }
+  const p = c.sort((x, y) => y.note - x.note || y.ms - x.ms)[0];
+  lancerRecit({ plans: [p], parPlanS: RR.plan.maxS, dureeS: RR.plan.maxS }, { simule: true });
+});
+/* Vérifier la météo réelle : les trois dernières heures, valeurs brutes d'Open-Meteo et interprétation du jeu, côte à côte */
+$('#lab-verif').addEventListener('click', () => {
+  const el = $('#lab-verif-table');
+  if (!brutMeteo || !brutMeteo.j.hourly){ el.textContent = 'Pas encore de réponse d\'Open-Meteo dans cette visite (hors ligne, ou requête en cours).'; return; }
+  const h = brutMeteo.j.hourly, maint = MET.cleHeure(Date.now()), i0 = h.time.findIndex(t => t >= maint.slice(0, 13));
+  const fin = i0 < 0 ? h.time.length - 1 : i0, idx = [fin - 2, fin - 1, fin].filter(i => i >= 0);
+  const v = (x, n = 1) => x == null ? '—' : (+x).toFixed(n);
+  el.innerHTML = `<table class="verif"><tr><th>Heure (Tokyo)</th><th>Open-Meteo brut</th><th>Le jeu</th></tr>` + idx.map(i => {
+    const m = magasin.a(MET.msDe(h.time[i]));
+    const brut = `code ${h.weather_code[i]}, ${v(h.temperature_2m[i])} °C, précip. ${v(h.precipitation[i])} mm, neige ${v(h.snowfall[i])} cm, au sol ${v(h.snow_depth[i], 2)} m, vent ${v(h.wind_speed_10m[i], 0)} km/h, nuages ${h.cloud_cover[i]} %`;
+    const jeu = m.source === 'reelle' ? `${WX_LABEL[m.kind]} (${m.kind}), ${v(m.temp)} °C, neige au sol ${Math.round((m.snowDepth||0)*100)} cm, vent ${v(m.wind, 0)} km/h · source ${m.source}` : `source ${m.source} (${m.statut || ''})`;
+    return `<tr><td>${h.time[i].replace('T', ' ')}</td><td>${brut}</td><td>${jeu}</td></tr>`; }).join('') + `</table>Réponse reçue à ${MET.hhmm(brutMeteo.recu)}.`;
+});
 $('#lab-recit-lire').addEventListener('click', () => {
   const h = +$('#lab-absence').value, a = Date.now(), r = RECIT.composer(RR, ctxRecit(a - h*H3, a));
   const types = RR.types;
@@ -1664,6 +1741,9 @@ function labVie(w, info){
     `Compte à rebours : ${F.compte != null ? F.compte : '—'}. Jour du test : ${j >= 1 && j <= 14 ? 'J' + j : 'hors du test'} (J1 = ${frDate(...FERM.debutTest.split('-').map(Number))}).`);
   l.push('Calendrier : ' + FERM.changements.map(c => { const d = VIE.dateDuJour(FERM, c.j); const etat = F.faits.includes(c.id) ? 'fait' : F.aujourdhui.includes(c.id) ? `à ${hhmm(c.h)}` : 'à venir'; return `J${c.j} ${frDate(d.y,d.m,d.d)} ${c.id} (${etat})`; }).join(' · ') + '.');
   const c = VIE.craieDuJour(CRAIE, FERM, w.y,w.m,w.d); l.push(`Tableau à craie : ${c ? c.id : 'aucune ligne'}.`);
+  { const pl = dayPlan(w.y,w.m,w.d), o = save.objets;
+    l.push(`<b>Graines et tirages</b> · sel du joueur (objets) : ${o.sel} ; journée (chat, objet oublié) : graine « ${dayKey(w.y,w.m,w.d)} », chat ${pl.cat.map(x => hhmm(x.from) + ' ' + x.spot).join(', ')}, objet oublié ${pl.item ? hhmm(pl.item.h) : 'aucun'} ; nuit : graine « nuit:${dayKey(w.y,w.m,w.d)} » ; ` +
+      `objet posé : ${o.pose ? o.pose.type + ' depuis ' + new Date(o.pose.ms).toLocaleString('fr-FR', {timeZone:'Asia/Tokyo'}) + ' (graine : minute de la pose, objet, sel)' : 'aucun'} ; dernière conséquence : ${o.trace ? o.trace.type + ' / ' + o.trace.id : 'aucune'}. Source météo de l'instant dessiné : ${vue.meteo.source}.`); }
   const nuit = nuitsDuJour(w).filter(x => x.debut >= 12).map(x => `${x.id} ${hhmm(x.debut)}${x.n ? ' (' + x.n + ')' : ''}${x.cause ? ' · cause : ' + x.cause : ''}`).join(', ');
   l.push(`<b>Nuit de ce soir</b> (tirage commun, causes réelles) : ${nuit}. Le chasse-neige et le cheminot sur le quai n'apparaissent qu'après 2 cm de neige réelle en 6 h.`);
   l.push('<b>Habitués</b> · ' + Object.values(HAB.fiches).map(f => `${f.role} : ${f.routine}${f.moment ? ' ; moment le ' + (d => frDate(d.y,d.m,d.d))(VIE.dateDuJour(FERM, FERM.changements.find(x => x.id === f.moment).j)) : ''}`).join(' · ') + `. Nom du chat : ${HAB.fiches.chat.nom || 'à choisir'}.`);
@@ -1686,10 +1766,12 @@ $('#lab-place').textContent = `Gare placée à ${STATION.lat}° N, ${STATION.lon
    Chaque mesure porte sa source. Seul l'Atelier simule, dans une mesure à part qui n'est jamais enregistrée. */
 const CACHE_METEO = 'nagori-meteo-v1';
 const magasin = MET.creerMagasin();
+let brutMeteo = null;
 try { const raw = localStorage.getItem(CACHE_METEO); if (raw) magasin.charger(raw, Date.now()); } catch (e) {}
 const clientMeteo = MET.creerClient({
   magasin, lat: STATION.lat, lon: STATION.lon, jours: MET.joursPasses(save.lastVisit, Date.now()),
-  fetch: (url, opts) => fetch(url, opts),
+  /* la dernière réponse brute d'Open-Meteo, pour « Vérifier la météo réelle » (Atelier) ; jamais enregistrée */
+  fetch: (url, opts) => fetch(url, opts).then(r => { if (AVEC_ATELIER && r.ok) r.clone().json().then(j => { brutMeteo = { j, recu: Date.now() }; }).catch(() => {}); return r; }),
   apres: etat => { if (etat.echecs === 0){ try { localStorage.setItem(CACHE_METEO, magasin.serialiser(Date.now())); } catch (e) {} quandMeteo(); } }
 });
 clientMeteo.actualiser();
@@ -1732,7 +1814,8 @@ function hud(w, info){
   const mt = vue.meteo; let wxText;
   if (mt.source === 'simulee') wxText = tx(T.meteoSimulee, {meteo: WX_LABEL[kind]});
   else if (mt.source === 'reelle'){ wxText = WX_LABEL[kind] + (mt.temp != null ? ` · ${Math.round(mt.temp)} °C` : ''); if (mt.wind >= 30) wxText += ` · ${T.vent}`; if (groundSnow() && !isSnow(kind)) wxText += ` · ${T.neigeAuSol}`; if (mt.ancienne) wxText += ' · ' + tx(T.meteoDe, {heure: MET.hhmm(mt.recu)}); }
-  else { wxText = mt.statut === 'attente' ? T.meteoAttente : mt.statut === 'heure-inconnue' ? T.meteoInconnue : T.meteoIndispo; if (groundSnow()) wxText += ` · ${T.neigeAuSol}`; }
+  else { if (mt.statut === 'indisponible' && !w.simulated) compter('meteo-indispo');
+    wxText = mt.statut === 'attente' ? T.meteoAttente : mt.statut === 'heure-inconnue' ? T.meteoInconnue : T.meteoIndispo; if (groundSnow()) wxText += ` · ${T.neigeAuSol}`; }
   $('#wx-status').textContent = statutMeteo();
   $('#sub').textContent = `${phaseLabel(info.sun)} · ${wxText}`;
   const F = info.ferm;
@@ -1745,7 +1828,7 @@ function hud(w, info){
   if (st.fermee || st.off) tl = '';
   else if (st.waiting) tl = T.voyageurAttend;
   else if (!st.welcomed) tl = tx(T.voyageurAnnonce, {date: frDate(st.tv.day.y,st.tv.day.m,st.tv.day.d), heure: hhmm(st.tv.h)});
-  else { let d = {y:w.y,m:w.m,d:w.d}; for (let n=0;n<20;n++){ d = addDays(d.y,d.m,d.d,1); const s2 = seasonOf(d.y,d.m,d.d); if (s2.i !== st.s.i){ const t2 = travelerOf(s2); tl = tx(T.voyageurProchain, {date: frDate(t2.day.y,t2.day.m,t2.day.d), heure: hhmm(t2.h)}); break; } } }
+  /* une fois le voyageur du test reparti, aucun autre n'est annoncé : ceux des autres sekki sont désactivés (cahier, lot J) */
   $('#trav-line').textContent = tl;
   $('#sekki-num').textContent = info.season.i+1; $('#ko-num').textContent = info.season.ko+1;
   $('#ko-kanji').textContent = k[0]; $('#ko-read').textContent = k[1];
@@ -1765,13 +1848,8 @@ function hud(w, info){
     persist(); toast(tx(T.momentAjoute, {moment: MOMENTS.find(m=>m.id===id).name}));
   }
   if (info.active.includes('firstsnow') && save.moments.includes('firstsnow') && momentSauvable('firstsnow')) { save.firstSnow = w.m >= 7 ? w.y : w.y-1; persist(); }
-  // gestes
-  const td = dayKey(w.y,w.m,w.d);
-  $('#g-water').classList.toggle('done', save.watered === td);
-  $('#g-feed').classList.toggle('done', save.fed === td);
-  $('#g-sweep').classList.toggle('done', info.debris < .05);
-  const dusk = info.sun.e < .08, lampDone = save.lamp === nightKey(w);
-  $('#g-lamp').classList.toggle('done', lampDone && dusk);
+  // gestes (cahier, lot J) : ni coches ni « gestes du jour » ; la lampe ne s'allume qu'au crépuscule
+  const dusk = info.sun.e < .08;
   $('#g-lamp').disabled = !dusk;
   $('#g-lamp').textContent = dusk ? T.lampeBouton : T.lampeBoutonJour;
   renderBook(info.season.ko);
@@ -1779,11 +1857,12 @@ function hud(w, info){
 }
 function checkSchedule(w){
   const mins = Math.floor(w.hour*60);
-  for (const t of TRAINS){ const tm = t.h*60+t.m; if (mins === tm){ const key = `${dayKey(w.y,w.m,w.d)}-${tm}`; if (key !== lastTrainKey){ lastTrainKey = key; const st = travelerState(w); const isTv = voyageurActif() && t.h===N.VOYAGEUR.h && t.m===N.VOYAGEUR.m && dayKey(st.tv.day.y,st.tv.day.m,st.tv.day.d)===dayKey(w.y,w.m,w.d) && !st.welcomed && !save.arrived[st.tv.key]; const fermee = prov() && VIE.fermeture(FERM, w.y,w.m,w.d,w.hour).prov.fermee; startTrain({stop:t.stop && !fermee, traveler:isTv && !fermee}); } } }
+  for (const t of TRAINS){ const tm = t.h*60+t.m; if (mins === tm){ const key = `${dayKey(w.y,w.m,w.d)}-${tm}`; if (key !== lastTrainKey){ lastTrainKey = key; const st = travelerState(w); const isTv = voyageurActif() && !travelerState(w).off && t.h===N.VOYAGEUR.h && t.m===N.VOYAGEUR.m && dayKey(st.tv.day.y,st.tv.day.m,st.tv.day.d)===dayKey(w.y,w.m,w.d) && !st.welcomed && !save.arrived[st.tv.key]; const fermee = prov() && VIE.fermeture(FERM, w.y,w.m,w.d,w.hour).prov.fermee; startTrain({stop:t.stop && !fermee, traveler:isTv && !fermee}); } } }
 }
-let lastObjets = -1e9;
+let lastObjets = -1e9; let lastFrame0 = performance.now();
 function frame(now){
   const dt = Math.min(.1, (now - lastFrame)/1000); lastFrame = now; clock += dt;
+  surveillerPerf((now - lastFrame0)/1000); lastFrame0 = now;
   if (sim.fast && sim.hour != null) sim.hour = (sim.hour + dt*.25) % 24;
   if (lecture) avancerRecit(dt);
   const w = lecture ? lecture.w : worldTime(); cur = w;
@@ -1819,6 +1898,10 @@ save.prevVisit = prev; save.lastVisit = Date.now(); persist();
 const touch = () => { save.lastVisit = Date.now(); persist(); };
 setInterval(touch, 30e3); addEventListener('pagehide', touch); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') touch(); });
 requestAnimationFrame(frame);
+/* mesure (lot L) : l'heure de Paris de la visite, arrondie ; 60 s passées à regarder (page visible), avec ou sans geste */
+{ const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date()).map(x => [x.type, x.value]));
+  compter('visite-h' + String((+p.hour + (+p.minute >= 30 ? 1 : 0)) % 24).padStart(2, '0'));
+  let vu = 0; const t = setInterval(() => { if (document.visibilityState === 'visible') vu++; if (vu >= 60){ clearInterval(t); compter('sejour-60s'); if (!aAgi) compter('sejour-sans-action'); } }, 1000);}
 /* une absence de 3 h ou plus, jamais proposée : le récit (vignette) ; sinon, comme avant, le registre */
 if (prev && Date.now() - prev >= RR.absenceMinH*H3 && !save.recit.vus.includes(prev)) preparerRecit(prev);
 else setTimeout(() => { if (!prev || Date.now() - prev > 20*60e3) openRegistre(prev); }, 900);
