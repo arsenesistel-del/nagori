@@ -1,4 +1,4 @@
-# Nagori · passation (28 octobre 2026, session 3 verrouillée avant la session 4)
+# Nagori · passation (28 octobre 2026, début de la session 4)
 
 Document de reprise pour une nouvelle conversation. Ne duplique pas la bible ni le cahier des charges : il dit où on en est.
 
@@ -10,11 +10,11 @@ Document de reprise pour une nouvelle conversation. Ne duplique pas la bible ni 
 
 ## État réel du dépôt
 - Dépôt `arsenesistel-del/nagori`, branche de travail **`session-1`** (poussée). `main` et le site public sont inchangés (`6e05c57`). Ne rien fusionner ni déployer sans accord explicite d'Arsène.
-- Dernier commit de code : « Session 3 : textes à écrire masqués en jeu normal, points provisoires notés ». Vérifier avec `git log --oneline | head`.
-- Étiquettes `avant-session-1` (sur `6e05c57`), `avant-session-2`, `avant-session-3` (sur `d491c70`), `avant-session-3-cahier` (sur `d37fcd4`) : locales seulement, le proxy refuse de les pousser. Non bloquant (validé). Elles disparaissent avec l'espace de travail : en cas de besoin, retrouver les commits par leur message.
-- Tests à lancer avant toute fin de session : `node tests/meteo.test.js` (27), `node tests/objets.test.js` (18), `node tests/vie.test.js` (22), `python3 -I tests/navigateur.test.py` (~3 min), `python3 -I tests/objets.navigateur.test.py` (~4 min), `python3 -I tests/vie.navigateur.test.py` (~2 min).
+- Dernier commit de code : « Session 4 : interrupteur du voyageur ». Vérifier avec `git log --oneline | head`.
+- Étiquettes `avant-session-1` (sur `6e05c57`), `avant-session-2`, `avant-session-3` (sur `d491c70`), `avant-session-3-cahier` (sur `d37fcd4`), `avant-session-4` (sur `077be75`) : locales seulement, le proxy refuse de les pousser. Non bloquant (validé). Elles disparaissent avec l'espace de travail : en cas de besoin, retrouver les commits par leur message.
+- Tests à lancer avant toute fin de session : `node tests/meteo.test.js` (27), `node tests/objets.test.js` (18), `node tests/vie.test.js` (22), `python3 -I tests/navigateur.test.py` (~3 min), `python3 -I tests/objets.navigateur.test.py` (~4 min), `python3 -I tests/vie.navigateur.test.py` (~2 min), `python3 -I tests/voyageur.navigateur.test.py` (~2 min).
 - Session cloud : Python n'a pas Playwright d'office. `pip install playwright==1.63.0 pillow` (la version doit correspondre au Chromium de `/opt/pw-browsers`, sinon « Executable doesn't exist »).
-- Captures de référence : `tests/captures/fin-session-3-cahier/` (six états et `traces/`, sans le provisoire ; `lots-fgh/` : seize états des lots F, G, H, préfixe `p-` pour le provisoire).
+- Captures de référence : `tests/captures/avant-session-4/` (six états et `traces/`, voyageur activé) et `tests/captures/fin-session-3-cahier/` (six états et `traces/`, sans le provisoire ; `lots-fgh/` : seize états des lots F, G, H, préfixe `p-` pour le provisoire).
 
 ## Fait
 - Session 1 (lots A, B) : météo honnête (`js/meteo.js`), point de vue, sauvegarde v3, tests, captures, région.
@@ -33,8 +33,31 @@ Document de reprise pour une nouvelle conversation. Ne duplique pas la bible ni 
 - **Dates de fermeture** : 12 mars 2027 (dernier jour) et 13 mars 2027 (révision) gardées, provisoires, à vérifier contre le cahier complet (`data/fermeture.js`).
 - **Japonais** : 駅廃止のお知らせ, 3月12日, あと{n}日, 駅ノート restent provisoires tant qu'une personne compétente ne les a pas relus (`data/textes.js`, `fermeture`).
 - **Rapport sur 14 nuits** : critère non rempli. Le dépôt n'a que 7 nuits réelles (octobre) ; les 14 nuits de novembre de `outils/nuits.js` sont simulées et ne valident rien.
-- **Voyageur** : interrupteur à traiter (voir « Dépendances »).
+- **Voyageur** : interrupteur posé au début de la session 4, avant le récit de l'absence (fait, voir plus bas).
 - Ne modifier ni `main` ni le site public.
+
+## Décisions d'Arsène (28 octobre, suite)
+- Interrupteur du voyageur au début de la session 4, vérifié partout, tests des deux états : **fait**.
+- Valeurs de la nuit (cerfs, neige, fenêtre de ferme) gardées dans les données, marquées NON VALIDÉ ; pas de refonte avant vérification du cahier complet.
+- Dates du 12 et du 13 mars 2027 : provisoires jusqu'à vérification du cahier complet.
+- Japonais : provisoire, jamais présenté comme validé.
+- Éléments visuels : ceux du cahier restent ; les ajouts d'interprétation sont réglables dans les données (moments : `HABITUES.moments`, positions comprises ; trajets des cerfs et du renard : `NUIT.evenements.*.trajet`) ou derrière la case provisoire de l'Atelier.
+- Sons : après les fonctionnalités essentielles.
+
+## Session 4
+### Interrupteur du voyageur (fait)
+- Réglage du jeu : `VOYAGEUR.actif` dans `data/monde.js` (`true` pour l'instant ; la valeur pour le test est à décider par Arsène).
+- Désactivé : rien dans la scène (assis, arrivée par le train de 16 h 20, départ), bandeau, registre, panneau (et le toucher), section « Voyageurs et omiyage » du carnet, omiyage de la façade, furin (son), boutons « Faire venir le voyageur » et « Voir tous les omiyage » de l'Atelier. Le train de 16 h 20 s'arrête comme les autres.
+- Sauvegarde : `gifts` et `arrived` restent intacts quand il est désactivé ; rien n'est écrit pour lui ; réactivé, tout revient. Aucun champ nouveau.
+- Atelier : case « Voyageur du sekki activé » pour essayer l'autre état, jamais enregistrée (retour au réglage du jeu au rechargement).
+- Objets : aucun lien avec le voyageur dans le code ; poser un objet marche dans les deux états. Reste un texte à trancher : la note des objets trouvés du carnet (`T.carnetAucunObjet`) dit « Les voyageurs oublient parfois quelque chose sur le banc » (voyageurs au sens général). À garder ou réécrire par Arsène si le voyageur est désactivé.
+- Tests : `tests/voyageur.navigateur.test.py`, 29 contrôles, les deux états.
+- Le récit de l'absence devra lire `voyageurActif()` (dans `js/jeu.js`).
+
+### Récit de l'absence (lot E) : bloqué
+- Le dépôt n'a que l'extrait des lots F, G, H. Sans le texte du lot E (et ses critères de la partie 9), le récit n'est pas commencé, pour ne pas refaire l'erreur de la session 3.
+- Ce qu'on sait déjà : les conséquences des objets se résolvent à la fin de leur fenêtre et le récit ne doit jamais prétendre que le joueur y a assisté en direct ; le point de vue (`vue`, `pointDeVue`) est prêt à recevoir d'autres instants ; chaque changement de la fermeture « peut devenir un plan du récit » ; les emplacements de texte restent invisibles en jeu normal.
+- Il faut : `docs/cahier-lot-E.md` (copie verbatim du lot E et des critères concernés), comme pour les lots F, G, H.
 - Étiquettes git locales : acceptées telles quelles.
 - Organisation : un chat par session ou demande importante ; rien dans `main` sans accord.
 
@@ -55,7 +78,7 @@ Document de reprise pour une nouvelle conversation. Ne duplique pas la bible ni 
 
 ### Incomplet
 - Tous les textes (emplacements « à écrire ») : traduction de l'avis, 3 entrées du cahier, 7 lignes de craie, 2 lignes par habitué, lignes des moments, lignes de registre des changements, textes de la nuit, traces de la session 2, textes des kō, voyageur. Conséquence en jeu normal tant qu'ils manquent : le cahier de la gare ne s'ouvre pas, le registre n'a pas les lignes des changements, toucher l'avis, la craie ou un habitué n'affiche rien. Le critère « chaque changement a sa ligne au registre » n'est donc rempli qu'avec `?atelier`.
-- Voyageur : « seulement s'il est activé » (J9) et « voyageur désactivé : aucune trace de lui nulle part » non faits.
+- Voyageur : interrupteur fait (session 4) ; la valeur pour le test reste à décider.
 - Rapport sur 14 nuits réelles : manque la série réelle.
 - Sons nouveaux (scooter, chasse-neige, sabots, pelle) : facultatifs, non faits.
 - « Peut devenir un plan du récit » : session 4.
@@ -71,14 +94,15 @@ Document de reprise pour une nouvelle conversation. Ne duplique pas la bible ni 
 - Le provisoire hors cahier, derrière la case de l'Atelier : garder, retirer ou intégrer (lune et clair de lune, papillons, pas dans la neige, parapluie et bonnet, vieille dame absente par mauvais temps, chat à l'abri, fin de service à 18 h 45 le dernier jour, fleurs à J−7, bandeau à J−30).
 
 ## Dépendances restantes
-- **Voyageur** : il touche la scène (arrivée par le train de 16 h 20, banc), le bandeau, le registre, son panneau, le carnet (omiyage), les omiyage de la façade, le son du furin, la sauvegarde (`gifts`, `arrived`) et l'Atelier. Le récit de l'absence (session 4) en ajoutera un usage. Avis : poser l'interrupteur (une constante lue à ces endroits) au début de la session 4, avant d'écrire le récit, pour que celui-ci le respecte dès le départ ; au plus tard avant le test avec les testeurs. Décision d'Arsène.
+- **Voyageur** : interrupteur fait. Reste la valeur pour le test (activé ou non) et la note des objets trouvés du carnet.
+- **Lot E** : extrait du cahier à copier dans `docs/`.
 - Textes d'Arsène (session 6a, textes des 2, 9 et 16 novembre).
 - Série réelle de 14 nuits : à capturer par le navigateur intégré (le terminal n'atteint pas Open-Meteo), puis `node outils/nuits.js FICHIER`.
 - Relecture du japonais.
 - Bible et cahier : la région (« hors de toute gare réelle ») reste à corriger par Arsène.
 
 ## Prochaine action concrète
-Arsène tranche les points « à valider » et l'interrupteur du voyageur, puis la session 4 (lot E). Pas de refonte de la session 3 d'ici là.
+Arsène copie le lot E du cahier dans `docs/cahier-lot-E.md` ; puis le récit de l'absence. Pas de refonte de la session 3 d'ici là.
 
 ## Pièges connus
 - Le terminal n'atteint pas Open-Meteo ; les séries réelles passent par le navigateur intégré. Les tests naviguent avec Open-Meteo simulé.

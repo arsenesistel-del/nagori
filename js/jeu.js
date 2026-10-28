@@ -36,6 +36,9 @@ const WX_PARAMS = {
  snow:{cloud:.85,rain:0,snow:1,fog:.2,storm:0}, heavysnow:{cloud:.95,rain:0,snow:1.6,fog:.4,storm:0},
  fog:{cloud:.6,rain:0,snow:0,fog:1,storm:0}, storm:{cloud:1,rain:1.4,snow:0,fog:.1,storm:1}
 };
+/* le voyageur du sekki : réglage du jeu (data/monde.js), que l'Atelier peut remplacer le temps d'un essai, sans rien enregistrer */
+let voyageurEssai = null;
+const voyageurActif = () => voyageurEssai != null ? voyageurEssai : N.VOYAGEUR.actif !== false;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* ---------- Sauvegarde locale ---------- */
@@ -115,7 +118,7 @@ function habitues(w, F, nuit){
   if (school){
     if (moment('ecolier') && h >= MOM.ecolier.de && h < MOM.ecolier.a){
       /* son moment (vendredi 20 novembre) : il s'arrête devant l'avis officiel avant son train */
-      const M = MOM.ecolier, AV = 535;
+      const M = MOM.ecolier, AV = M.x;
       if (h < M.de + .06){ const t = (h - M.de)/.06; out.push({kind:'kid', x:lerp(1260,AV,t), walk:true, moment:true, umbrella:pluie, hat:bonnet}); }
       else if (h < M.avis) out.push({kind:'kid', x:AV, walk:false, face:1, moment:true, umbrella:pluie, hat:bonnet});
       else { const t = clamp((h - M.avis)/(M.a - .01 - M.avis), 0, 1); out.push({kind:'kid', x:lerp(AV,940,t), walk:t<1, moment:true, umbrella:pluie, hat:bonnet}); }
@@ -135,11 +138,11 @@ function habitues(w, F, nuit){
   if (moment('cheminot') && h >= C.de && h < C.a){
     /* son moment (jeudi 26 novembre) : l'inventaire, des étiquettes numérotées sur le banc, le poêle et l'horloge */
     let x, walk = true, quai = h >= C.banc - .02;
-    if (h < C.banc) x = lerp(1500, 800, (h - C.de)/(C.banc - C.de));
-    else if (h < C.gare - .04){ x = 800; walk = false; }
-    else if (h < C.gare) x = lerp(800, 480, (h - (C.gare - .04))/.04);
-    else if (h < C.a - .18){ x = 480; walk = false; }
-    else x = lerp(480, 100, (h - (C.a - .18))/.18);
+    if (h < C.banc) x = lerp(1500, C.xBanc, (h - C.de)/(C.banc - C.de));
+    else if (h < C.gare - .04){ x = C.xBanc; walk = false; }
+    else if (h < C.gare) x = lerp(C.xBanc, C.xGare, (h - (C.gare - .04))/.04);
+    else if (h < C.a - .18){ x = C.xGare; walk = false; }
+    else x = lerp(C.xGare, 100, (h - (C.a - .18))/.18);
     out.push({kind:'worker', x, walk, quai, clipboard:true, moment:true});
   }
   else for (const [a,b] of [[10.4,10.9],[21.4,21.9]]) if (h >= a && h < b){ out.push({kind:'worker', x:lerp(1500,100,(h-a)/(b-a)), walk:true, lantern: a > 20}); }
@@ -506,7 +509,8 @@ function etiquette(quoi){
   return F.jour > c.j || (F.jour === c.j && cur.hour >= MOM.cheminot.etiquettes[quoi]);
 }
 function etiquetteEn(x, y, k){ ctx.fillStyle = col([250,250,244], k); ctx.fillRect(x, y, 5, 3.4); ctx.fillStyle = col([60,60,70], k); ctx.fillRect(x+1, y+1.4, 3, .6); }
-function hasGift(i){ return save.preview || Object.values(save.gifts).includes(i); }
+/* les omiyage sur la façade : seulement si le voyageur est activé (ils restent dans la sauvegarde sinon) */
+function hasGift(i){ return voyageurActif() && (save.preview || Object.values(save.gifts).includes(i)); }
 
 /* le bâtiment : salle d'attente en bois, toit de tôle rouge comme à Hokkaidō, poêle l'hiver */
 function drawStation(L, night, snowy, info, temp, wind){
@@ -896,14 +900,16 @@ function drawFerme(L, allumee, snowy){
   if (allumee){ ctx.fillStyle = 'rgba(255,214,140,.95)'; ctx.fillRect(fx+8, base-10, 5, 4); glow(fx+10, base-8, 16, '255,200,120', .5); streak(fx+10, 552, 4, 34, '255,214,140', .25); }
 }
 /* le renard, près de la salle d'attente ; les cerfs, sur la voie, qui s'arrêtent sous la lampe (yeux qui brillent) */
-function posRenard(k){ return k < .35 ? lerp(150, 470, k/.35) : k < .75 ? 470 : lerp(470, 150, (k-.75)/.25); }
-function posCerf(k, i){ const b = k < .4 ? lerp(1500, 760, k/.4) : k < .7 ? 760 : lerp(760, 150, (k-.7)/.3); return b + i*44; }
+/* trajets (data/monde.js, NUIT.evenements.*.trajet) : [départ, arrêt, arrivée] en x, et la part du temps où la bête s'arrête */
+function posTrajet(T, k){ const [a, b, c] = T.x, [p, q] = T.arret; return k < p ? lerp(a, b, k/p) : k < q ? b : lerp(b, c, (k-q)/(1-q)); }
+function posRenard(k){ return posTrajet(NUIT.evenements.renard.trajet, k); }
+function posCerf(k, i){ return posTrajet(NUIT.evenements.cerfs.trajet, k) + i*44; }
 function drawRenard(v, L, night){
-  const k = v.k, x = posRenard(k), arret = k >= .35 && k < .75, f = k < .35 ? 1 : -1;
+  const k = v.k, x = posRenard(k), [p, q] = NUIT.evenements.renard.trajet.arret, arret = k >= p && k < q, f = k < p ? 1 : -1;
   drawBete('renard', x, 684, f, !arret, arret, L, night);
 }
 function drawCerfs(v, L, night){
-  const arret = v.k >= .4 && v.k < .7;
+  const [p, q] = NUIT.evenements.cerfs.trajet.arret, arret = v.k >= p && v.k < q;
   for (let i = 0; i < (v.n || 1); i++) drawBete('cerf', posCerf(v.k, i), 664, -1, !arret, arret, L, night);
 }
 function drawBete(id, x, y, f, marche, regarde, L, night){
@@ -1175,9 +1181,11 @@ function travelerState(w){
   const welcomed = save.gifts[tv.key] != null;
   const arrived = save.arrived[tv.key] || idx(w.y,w.m,w.d,w.hour) >= tv.at;
   const fermee = prov() && VIE.fermeture(FERM, w.y,w.m,w.d,w.hour).prov.fermee;      // provisoire, hors cahier : plus de voyageur une fois la gare fermée
-  return { s, tv, welcomed, fermee, waiting: arrived && !welcomed && !fermee };
+  const off = !voyageurActif();
+  return { s, tv, welcomed, fermee, off, waiting: arrived && !welcomed && !fermee && !off };
 }
 function updateTraveler(dt){
+  if (!voyageurActif()){ trav.state = 'none'; return; }
   if (trav.state==='walk'){ trav.x -= 38*dt; trav.walk += dt*7; if (trav.x <= 750){ trav.state='none'; const st = travelerState(worldTime()); save.arrived[st.tv.key] = true; persist(); showTraveler(); } }
   else if (trav.state==='leave'){ trav.x -= 40*dt; trav.walk += dt*7; if (trav.x < 500) trav.alpha -= dt*1.2; if (trav.alpha<=0) trav.state='none'; }
 }
@@ -1220,7 +1228,7 @@ function eventsOfDay(y,m,d){
   { const mv = prov() ? magasin.a(jstMs(y,m,d,13)) : null; if (!mv || mv.source !== 'reelle' || VIE.vieilleVient(RG, mv)) ev.push([13.5, R.vieilleDame]); }
   if (school) ev.push([16.36, R.ecolierRetour]);
   const tv = travelerOf(s);
-  if (dayKey(tv.day.y,tv.day.m,tv.day.d) === dayKey(y,m,d)) ev.push([tv.h + .03, R.voyageur, true]);
+  if (voyageurActif() && dayKey(tv.day.y,tv.day.m,tv.day.d) === dayKey(y,m,d)) ev.push([tv.h + .03, R.voyageur, true]);
   if (p.item) ev.push([p.item.h, tx(R.objet, {objet: ITEMS[p.item.idx]}), true]);
   ev.push([21.6, R.cheminotSoir]);
   /* la fermeture : chaque changement a sa ligne, le jour où il arrive (data/fermeture.js) */
@@ -1269,18 +1277,19 @@ SEKKI.forEach((s,i)=>{
 });
 let bookSig = '';
 function renderBook(currentKo){
-  const sig = JSON.stringify([currentKo, save.stamps.length, save.moments, save.gifts, save.found.length]);
+  const sig = JSON.stringify([currentKo, save.stamps.length, save.moments, save.gifts, save.found.length, voyageurActif()]);
   if (sig === bookSig) return; bookSig = sig;
   for (let n=0;n<72;n++){ const el = document.getElementById('st-'+n); const on = save.stamps.includes(n); el.classList.toggle('on', on); el.classList.toggle('now', n===currentKo); el.textContent = on ? KO[n][0][0] : n+1; }
   $('#book-count').textContent = `${save.stamps.length}/72`;
   $('#moments').innerHTML = MOMENTS.map(m => { const on = save.moments.includes(m.id); return `<div class="mom r-${m.rar} ${on?'on':''}"><span>${on ? m.name : '· · ·'}</span><em>${m.rar}</em></div>`; }).join('');
-  const got = Object.entries(save.gifts);
+  $('#gifts-titre').hidden = $('#gifts').hidden = !voyageurActif();
+  const got = voyageurActif() ? Object.entries(save.gifts) : [];
   $('#gifts').innerHTML = got.length ? got.map(([k,g]) => { const [y,m,d] = k.split('-').map(Number); const s = SEKKI[seasonOf(y,m,d).i]; return `<div class="mom on"><span>${tx(T.carnetVoyageur, {sekki: s[1], cadeau: GIFTS[g]})}</span><em>${s[0]}</em></div>`; }).join('') + `<div class="note">${tx(T.carnetVoyageurs, {n: got.length, s: got.length>1?'s':''})}</div>` : `<div class="note">${T.carnetAucunVoyageur}</div>`;
   $('#found').innerHTML = save.found.length ? save.found.map(f => `<div class="mom on"><span>${ITEMS[f.idx]}</span><em>${frDate(...f.key.split('-').map(Number))}</em></div>`).join('') : `<div class="note">${T.carnetAucunObjet}</div>`;
 }
 
 function showTraveler(){
-  const st = travelerState(worldTime()); if (!st.waiting){ return; }
+  const st = travelerState(worldTime()); if (!st.waiting){ $('#traveler').hidden = true; return; }
   const s = SEKKI[st.s.i];
   panelStep = 0;
   $('#tr-eyebrow').textContent = tx(T.voyageurArrive, {date: frDate(st.tv.day.y, st.tv.day.m, st.tv.day.d), heure: hhmm(st.tv.h)});
@@ -1415,6 +1424,8 @@ cv.addEventListener('click', ev => {
 
 /* Atelier et tests : coordonnées d'écran d'un point de la scène (1600 × 900) */
 if (new URLSearchParams(location.search).has('atelier')) N.ecran = (x, y) => { const r = cv.getBoundingClientRect(); return [r.left + OX + x*S, r.top + OY + y*S]; };
+/* Atelier et tests : ce que la scène fait du voyageur en ce moment (lecture seule) */
+if (AVEC_ATELIER) N.etatVoyageur = () => { const st = travelerState(worldTime()); return { actif: voyageurActif(), attend: st.waiting, marche: trav.state, omiyage: [0,1,2,3,4,5].filter(hasGift), panneau: !$('#traveler').hidden }; };
 
 /* ---------- Étagère de la salle d'attente (lot C) ----------
    On pose un objet ou on le reprend. Ni compteur, ni indice, ni probabilité ; ne rien poser n'a aucun effet. */
@@ -1492,6 +1503,9 @@ $('#lab-weather').addEventListener('change', ev => { sim.weather = ev.target.val
 $('#lab-ground').addEventListener('change', ev => { sim.ground = ev.target.checked; });
 $('#lab-wind').addEventListener('input', ev => { sim.wind = +ev.target.value; });
 $('#lab-train').addEventListener('click', () => { if (!startTrain({stop:false})) toast('Un train est déjà là.'); });
+{ const c = $('#lab-voyageur'); c.checked = voyageurActif();
+  const maj = () => { $('#lab-traveler').hidden = $('#lab-gifts').hidden = !voyageurActif(); if (!voyageurActif()) $('#traveler').hidden = true; bookSig = ''; };
+  c.addEventListener('change', () => { voyageurEssai = c.checked; maj(); }); maj(); }
 $('#lab-traveler').addEventListener('click', () => {
   const st = travelerState(worldTime());
   if (st.welcomed){ toast('Le voyageur de ce sekki est déjà reparti. « Tout remettre à zéro » pour le revoir.'); return; }
@@ -1603,7 +1617,7 @@ function hud(w, info){
     fl.hidden = !t; fl.textContent = t; }
   if (ATELIER) $('#lab-vie').innerHTML = labVie(w, info);
   const st = info.tstate; let tl = '';
-  if (st.fermee) tl = '';
+  if (st.fermee || st.off) tl = '';
   else if (st.waiting) tl = T.voyageurAttend;
   else if (!st.welcomed) tl = tx(T.voyageurAnnonce, {date: frDate(st.tv.day.y,st.tv.day.m,st.tv.day.d), heure: hhmm(st.tv.h)});
   else { let d = {y:w.y,m:w.m,d:w.d}; for (let n=0;n<20;n++){ d = addDays(d.y,d.m,d.d,1); const s2 = seasonOf(d.y,d.m,d.d); if (s2.i !== st.s.i){ const t2 = travelerOf(s2); tl = tx(T.voyageurProchain, {date: frDate(t2.day.y,t2.day.m,t2.day.d), heure: hhmm(t2.h)}); break; } } }
@@ -1640,7 +1654,7 @@ function hud(w, info){
 }
 function checkSchedule(w){
   const mins = Math.floor(w.hour*60);
-  for (const t of TRAINS){ const tm = t.h*60+t.m; if (mins === tm){ const key = `${dayKey(w.y,w.m,w.d)}-${tm}`; if (key !== lastTrainKey){ lastTrainKey = key; const st = travelerState(w); const isTv = t.h===N.VOYAGEUR.h && t.m===N.VOYAGEUR.m && dayKey(st.tv.day.y,st.tv.day.m,st.tv.day.d)===dayKey(w.y,w.m,w.d) && !st.welcomed && !save.arrived[st.tv.key]; const fermee = prov() && VIE.fermeture(FERM, w.y,w.m,w.d,w.hour).prov.fermee; startTrain({stop:t.stop && !fermee, traveler:isTv && !fermee}); } } }
+  for (const t of TRAINS){ const tm = t.h*60+t.m; if (mins === tm){ const key = `${dayKey(w.y,w.m,w.d)}-${tm}`; if (key !== lastTrainKey){ lastTrainKey = key; const st = travelerState(w); const isTv = voyageurActif() && t.h===N.VOYAGEUR.h && t.m===N.VOYAGEUR.m && dayKey(st.tv.day.y,st.tv.day.m,st.tv.day.d)===dayKey(w.y,w.m,w.d) && !st.welcomed && !save.arrived[st.tv.key]; const fermee = prov() && VIE.fermeture(FERM, w.y,w.m,w.d,w.hour).prov.fermee; startTrain({stop:t.stop && !fermee, traveler:isTv && !fermee}); } } }
 }
 let lastObjets = -1e9;
 function frame(now){

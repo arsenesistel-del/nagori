@@ -35,13 +35,13 @@ RACINE_H.NAGORI.HABITUES = {
   },
 
   /* mise en scène des moments de fermeture, le jour donné par data/fermeture.js. Le cahier fixe le jour et, pour le cheminot,
-     l'inventaire ; le reste (où, combien de temps) est provisoire, à valider par Arsène.
+     l'inventaire ; le reste (où, combien de temps) est NON VALIDÉ, à valider par Arsène.
      ecolier : s'arrête devant l'avis officiel avant son train ; vieille : reste sur le banc après le départ du train de 13 h 30 ;
      cheminot : fait l'inventaire et colle des étiquettes numérotées sur le banc, le poêle et l'horloge (elles restent ensuite). */
   moments: {
-    ecolier:  { de: 7.5,  avis: 7.72, a: 7.8 },
+    ecolier:  { de: 7.5,  avis: 7.72, a: 7.8, x: 535 },                                   /* x : devant l'avis officiel */
     vieille:  { reste: 13.95, a: 14.03 },
-    cheminot: { de: 10.4, banc: 10.5, gare: 10.68, a: 11.1, etiquettes: { banc: 10.58, poele: 10.78, horloge: 10.86 } }
+    cheminot: { de: 10.4, banc: 10.5, gare: 10.68, a: 11.1, xBanc: 800, xGare: 480, etiquettes: { banc: 10.58, poele: 10.78, horloge: 10.86 } }
   },
 
   /* provisoire, hors cahier (session 3, première version), seulement avec la case « provisoire » de l'Atelier :

@@ -14,8 +14,11 @@ NAGORI.TRAINS = [
   { h: 16, m: 20, stop: true }, { h: 18, m: 45, stop: true }, { h: 21, m: 10, stop: false }
 ];
 
-/* Le voyageur du sekki : jour d'arrivée après le début du sekki, et train. */
-NAGORI.VOYAGEUR = { jour: 3, h: 16, m: 20 };
+/* Le voyageur du sekki : jour d'arrivée après le début du sekki, et train.
+   actif : le cahier le veut « seulement s'il est activé » (J9). Désactivé, il ne laisse aucune trace nulle part : ni dans la scène,
+   ni au bandeau, au registre, au carnet, ni ses omiyage sur la façade ou le furin ; la sauvegarde garde ses champs (gifts, arrived)
+   intacts, pour le retrouver si on le réactive. Valeur pour le test : à décider par Arsène (true reprend le comportement d'avant). */
+NAGORI.VOYAGEUR = { actif: true, jour: 3, h: 16, m: 20 };
 
 /* Omiyage : cadeaux laissés par les voyageurs, qui décorent la gare. id = dessin dans la scène. */
 NAGORI.OMIYAGE = [
@@ -50,7 +53,8 @@ NAGORI.NUIT = {
   routine: {
     /* le livreur de journaux en scooter passe le passage à niveau, phare allumé (pratique réelle, heure imaginée) */
     livreur: { de: 28.083, a: 28.333, duree: .012 },
-    /* une fenêtre de ferme s'allume sur l'autre rive vers 4 h 30, jusqu'au lever du soleil (imaginé, plausible) */
+    /* une fenêtre de ferme s'allume sur l'autre rive vers 4 h 30, jusqu'au lever du soleil (imaginé, plausible).
+       NON VALIDÉ : l'heure est tirée entre 4 h 20 et 4 h 40 (de, a) ; « vers 4 h 30 » est l'exigence du cahier. */
     ferme: { de: 28.33, a: 28.67 }
   },
   evenements: {
@@ -63,9 +67,13 @@ NAGORI.NUIT = {
        rares dans la neige profonde (au moins neigeProfondeCm de neige réelle au sol au moment du passage). Souvent aucun.
        Le cahier ne chiffre ni « neige profonde » ni les fréquences : neigeProfondeCm (40), facteurNeige, chance et automne
        sont des valeurs arbitraires, NON VALIDÉES, à régler ici. */
-    cerfs: { chance: .12, automne: .3, mois: [9, 10, 11], neigeProfondeCm: 40, facteurNeige: .2, de: 22, a: 28.5, duree: .05, max: 3 },
+    cerfs: { chance: .12, automne: .3, mois: [9, 10, 11], neigeProfondeCm: 40, facteurNeige: .2, de: 22, a: 28.5, duree: .05, max: 3,
+             /* NON VALIDÉ (interprétation de « traversent la voie » en vue de profil) : ils longent la voie, s'arrêtent sous la lampe, repartent */
+             trajet: { x: [1500, 760, 150], arret: [.4, .7] } },
     /* un renard près de la salle d'attente. Aucune cause particulière : environ 2 nuits sur 10. */
-    renard: { chance: .2, de: 22, a: 28.5, duree: .04 }
+    renard: { chance: .2, de: 22, a: 28.5, duree: .04,
+              /* NON VALIDÉ (mise en scène) : il vient jusqu'à la porte de la salle d'attente, s'y arrête, repart */
+              trajet: { x: [150, 470, 150], arret: [.35, .75] } }
   },
   /* provisoire, hors cahier (session 3, première version) : papillons de nuit autour de la lampe */
   papillons: { tempMin: 15 }
