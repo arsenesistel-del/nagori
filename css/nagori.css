@@ -134,3 +134,12 @@ button:disabled{opacity:.45;cursor:default}
 .etagere .ca-liste{display:flex;flex-direction:column;gap:10px;margin:10px 0;max-height:45vh;overflow:auto}
 .etagere .ca-entree time{font-size:.8em;opacity:.7}
 .etagere .ca-entree p{margin:2px 0 0}
+/* le récit de l'absence (lot E) */
+.vignette{align-self:center;pointer-events:auto;letter-spacing:.02em;background:var(--glass-strong)}
+.recit-sur{position:absolute;left:16px;bottom:16px;z-index:5;color:rgba(241,236,224,.82);font-size:.85em;letter-spacing:.03em;pointer-events:none;opacity:0;transition:opacity .4s}
+body.en-recit .recit-sur{opacity:1}
+body.en-recit .hud{opacity:0;pointer-events:none;transition:opacity .4s}
+.recit-ko{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;color:#f1ece0}
+.recit-ko[hidden]{display:none}
+.recit-ko .kanji{font-family:"Shippori Mincho",serif;font-size:clamp(40px,9vw,88px);letter-spacing:.08em}
+.recit-ko .kana{margin-top:8px;font-size:clamp(14px,2.4vw,20px);opacity:.8;letter-spacing:.1em}

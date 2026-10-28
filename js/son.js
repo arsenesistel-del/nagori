@@ -325,7 +325,9 @@ function disable(){
   clearInterval(tickTimer); tickTimer = null;
   setTimeout(() => { if (!on && ctx) ctx.suspend(); }, 1200);
 }
-N.son = { enable, disable, update, event, get on(){ return on; }, supported: !!AC,
+/* le récit de l'absence : l'ambiance de chaque plan à volume réduit (k de 0 à 1) ; rien si le son est coupé */
+function attenuer(k){ if (!ctx || !amb) return; amb.gain.setTargetAtTime(k, ctx.currentTime, .4); }
+N.son = { enable, disable, update, event, attenuer, get on(){ return on; }, supported: !!AC,
   /* outil de test : rend quelques secondes hors ligne pour mesurer les niveaux */
   _sounds: SOUNDS, _state: st, _tick: tick, _mix: mix, get _ctx(){ return ctx; } };
 })();

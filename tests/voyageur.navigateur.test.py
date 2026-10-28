@@ -6,7 +6,7 @@ bandeau, registre, carnet, omiyage de la façade, panneau, sauvegarde, objets, A
 
 Le réglage du jeu est VOYAGEUR.actif dans data/monde.js : le test sert une copie de ce fichier avec actif à true ou à false.
 Jour du voyageur de 小雪 en 2026 : le 25 novembre, train de 16 h 20 (début du sekki le 22, plus 3 jours)."""
-import datetime, json, pathlib, sys
+import datetime, json, pathlib, re, sys
 RACINE = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RACINE / 'outils'))
 import captures
@@ -14,7 +14,7 @@ from playwright.sync_api import sync_playwright
 
 echecs = []
 MONDE = (RACINE / 'data/monde.js').read_text(encoding='utf-8')
-assert 'actif: true' in MONDE
+assert re.search(r'VOYAGEUR = \{ actif: (true|false),', MONDE)
 
 
 def ok(cond, msg):
@@ -34,7 +34,7 @@ SAUVEGARDE = {'version': 3, 'gifts': {'2026-11-07': 0}, 'arrived': {'2026-11-07'
 
 def ouvrir(nav, port, actif, quand, query='', sauvegarde=None):
     ctx = nav.new_context(viewport={'width': 1280, 'height': 720}, service_workers='block')
-    monde = MONDE.replace('actif: true', 'actif: ' + ('true' if actif else 'false'))
+    monde = re.sub(r'VOYAGEUR = \{ actif: (true|false),', 'VOYAGEUR = { actif: ' + ('true' if actif else 'false') + ',', MONDE)
     def route(r):
         url = r.request.url
         if not url.startswith('http://127.0.0.1'): return r.abort()

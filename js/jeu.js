@@ -18,6 +18,7 @@ const MET = N.meteo;                 /* js/meteo.js : sources de la météo, pan
    de l'Atelier : visible seulement avec ?atelier. */
 const VIE = N.vie, HAB = N.HABITUES, NUIT = N.NUIT, FERM = N.FERMETURE, CRAIE = N.CRAIE, RG = HAB.regles, MOM = HAB.moments;
 const TF = T.fermeture, TH = T.habitues, TN = T.nuit, TP = T.provisoire;
+const RECIT = N.recit, RR = N.RECIT, TR = T.recit;   /* récit de l'absence (lot E) : js/recit.js, data/recit.js */
 const AVEC_ATELIER = new URLSearchParams(location.search).has('atelier');
 let provOn = AVEC_ATELIER;
 const prov = () => provOn;
@@ -46,10 +47,12 @@ const KEY = 'nagori-maquette-v2';
 /* version : 3 depuis le prototype de 14 jours. Les champs ajoutés viennent ici, avec leur valeur par défaut :
    l'ancienne sauvegarde est fusionnée par-dessus au chargement, sans migration. */
 const nouveauSel = () => { try { return Array.from(crypto.getRandomValues(new Uint32Array(2))).map(n => n.toString(36)).join(''); } catch (e) { return Math.random().toString(36).slice(2) + Date.now().toString(36); } };
-const fresh = () => ({ version:3, growth:0, watered:null, swept:null, fed:null, fedHour:0, lamp:null, stamps:[], moments:[], gifts:{}, arrived:{}, found:[], lastVisit:null, preview:false, objets:Object.assign(OBJ.etatVide(), { sel: nouveauSel() }) });
+const fresh = () => ({ version:3, growth:0, watered:null, swept:null, fed:null, fedHour:0, lamp:null, stamps:[], moments:[], gifts:{}, arrived:{}, found:[], lastVisit:null, preview:false, objets:Object.assign(OBJ.etatVide(), { sel: nouveauSel() }), recit:{ vus:[], hist:[], dernier:null } });
 let save = fresh();
 try { const raw = localStorage.getItem(KEY); if (raw) save = Object.assign(fresh(), JSON.parse(raw)); } catch (e) {}
 const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} };
+/* le récit de l'absence en cours de lecture (lot E), ou null */
+let lecture = null;
 
 /* ---------- Test de six semaines : compteur de visites ----------
    Chaque testeur reçoit un lien personnel (?t=prenom), mémorisé dans son navigateur.
@@ -184,6 +187,12 @@ let W=0,H=0,DPR=1, S=1, OX=0, OY=0, uiTop=0;
 const VW=1600, VH=900;
 const cam = { pan:0, vel:0, drag:null, justDragged:false };
 function layoutCam(){
+  if (lecture && lecture.plan.cadrage){
+    /* cadrage du plan (data/recit.js) : centre et largeur vue dans le repère de la scène */
+    const c = lecture.plan.cadrage, haut = Math.max(140, uiTop - 12);
+    S = Math.min(W/c.span, haut/(c.span*.5)); OX = W/2 - (c.cx != null ? c.cx : 760)*S; OY = haut/2 + 6 - c.cy*S;
+    return;
+  }
   const portrait = W < H*0.9;
   const span = portrait ? 520 : 1100, cx = portrait ? 592 : 760;
   S = Math.min(W/span, Math.max(140, uiTop - 12) / (portrait ? 400 : 460));
@@ -681,6 +690,12 @@ let apercuTrace = null, apercuGivre = false;
 /* ce qui est posé ou laissé, tel que la scène doit le montrer */
 function etatObjets(){
   const o = save.objets, ap = apercuTrace;
+  if (lecture){
+    /* pendant le récit : à l'instant du plan, l'objet était encore posé avant la fin de sa fenêtre ; la trace vient après */
+    const ms = lecture.plan.ms, tr = o.trace && ms >= o.trace.fin ? o.trace : null, rt = o.retourTrace && ms >= o.retourTrace.ms ? o.retourTrace : null;
+    const posee = o.trace && ms < o.trace.fin && ms >= (o.trace.fin - 30*3600e3) ? o.trace.type : null;
+    return { pose: posee, tr, retour: rt, out: !!(tr && tr.emprunt && !rt), habitude: !!(tr && tr.habitude) };
+  }
   if (ap) {
     if (ap.type === 'retour') return { pose: null, tr: null, retour: { trace: ap.trace }, out: false, habitude: false };
     return { pose: null, tr: ap, retour: null, out: !!ap.emprunt, habitude: !!ap.habitude };
@@ -1258,7 +1273,11 @@ function renderRegistre(fromMs){
     html += `<h3>${isToday ? T.registreAujourdhui : frDate(day.y,day.m,day.d,{weekday:'long',day:'numeric',month:'long'})}</h3><ul class="entries">` + rows.map(([h,t,k]) => `<li class="${k?'key':''}"><time>${hhmm(h)}</time><span>${t}</span></li>`).join('') + '</ul>';
   }
   if (!total) html += `<div class="note">${T.registreVide}</div>`;
+  /* (cahier) plus de 7 jours : une ligne neutre pour les jours calmes (texte à écrire, invisible en jeu normal) */
+  if (spanDays > 7 && montrable(TR.joursCalmes)) html += `<div class="note">${TR.joursCalmes}</div>`;
   $('#reg-body').innerHTML = html;
+  /* (cahier, lot J) le lien « Revoir » vers le récit de la dernière absence */
+  $('#reg-revoir').hidden = !save.recit.dernier;
 }
 function openRegistre(fromMs){ renderRegistre(fromMs); son.event('page'); $('#reg').hidden = false; $('#book').hidden = true; $('#lab').hidden = true; }
 
@@ -1396,6 +1415,7 @@ addEventListener('pointerup', () => { clearTimeout(holdTimer); cam.drag = null; 
 addEventListener('pointercancel', () => { clearTimeout(holdTimer); cam.drag = null; });
 cv.addEventListener('click', ev => {
   if (cam.justDragged){ cam.justDragged = false; return; }
+  if (lecture || performance.now() - finRecit < 600) return;
   const hit = sceneHit(ev); if (!hit) return;
   const info = computeInfo(worldTime());
   if (hit==='cat'){ const [cx,cy] = CAT_POS[info.cat]; purr = {x:cx, y:cy-6, t:0}; son.event('purr'); toast(info.cat === 'salle' ? TP.chatSalle : T.chatRonronne); }
@@ -1474,6 +1494,99 @@ function ouvrirCahier(){
 $('#ca-fermer').addEventListener('click', () => { $('#cahier').hidden = true; });
 $('#et-fermer').addEventListener('click', () => { $('#etagere').hidden = true; });
 
+/* ---------- Le récit de l'absence (lot E, docs/cahier-lot-E.md) ----------
+   js/recit.js choisit les plans ; ici on les lit : chaque plan est la scène à l'instant et avec la météo réelle de son heure,
+   cadrée, 2 à 4 s, fondu de 0,6 s, le jour et l'heure de la gare en surimpression. Un toucher passe le récit.
+   Pendant la lecture, rien n'est enregistré : ni tampon, ni moment, ni train, ni voyageur. */
+const H3 = 3600e3;
+function ctxRecit(de, a){
+  const arrivees = [];
+  if (voyageurActif()) for (const j of RECIT.jours(de, a)){ const tv = travelerOf(seasonOf(j.y, j.m, j.d)); if (tv.day.y === j.y && tv.day.m === j.m && tv.day.d === j.d) arrivees.push(jstMs(j.y, j.m, j.d, tv.h)); }
+  const e = clientMeteo.etat;
+  return { de, a, meteo: magasin, horsLigne: !navigator.onLine || e.echecs > 0 || e.dernierSucces == null,
+    sunElev: elevGare, koDuJour: (y,m,d) => seasonOf(y,m,d).ko, vie: VIE, NUIT, FERM, jourDecole: ms => OBJ.jourDecole(POSES, ms),
+    passages: Object.fromEntries(['ecolier','vieille','cheminot'].map(q => [q, HAB.fiches[q].passages.map(p => p.de)])),
+    objets: { trace: save.objets.trace, retour: save.objets.retourTrace }, voyageurArrivees: arrivees,
+    premiereNeigeFaite: ms => { const d = tokyoAt(ms); return save.firstSnow === (d.m >= 7 ? d.y : d.y - 1); }, hist: save.recit.hist };
+}
+const planSauve = p => ({ type: p.type, sous: p.sous || null, ms: p.ms, jour: p.jour, cadrage: p.cadrage || null, ko: p.ko != null ? p.ko : null, habitue: p.habitue || null, train: !!p.train });
+function lancerRecit(r, o = {}){
+  if (!r || !r.plans.length) return;
+  cacherVignette();
+  for (const id of ['book','lab','reg','etagere','cahier','traveler']) $('#' + id).hidden = true;
+  lecture = { plans: r.plans, parPlanS: r.parPlanS, i: -1, t: 0, simule: !!o.simule, train: Object.assign({}, train), pan: cam.pan, cloche: 0 };
+  document.body.classList.add('en-recit');
+  son.attenuer && son.attenuer(.45);
+  planSuivant();
+  /* la première lecture d'une absence compte pour l'anti-répétition (pas les essais de l'Atelier, ni « Revoir ») */
+  if (!o.simule && save.recit.dernier && !save.recit.dernier.vu){ save.recit.dernier.vu = true; save.recit.hist = save.recit.hist.concat([RECIT.memoire(r)]).slice(-RR.antiRepetition.recits); persist(); }
+}
+function planSuivant(){
+  const L = lecture; L.i++; L.t = 0;
+  if (L.i >= L.plans.length){ finirRecit(); return; }
+  const p = L.plan = L.plans[L.i], d = tokyoAt(p.ms);
+  L.w = { y: d.y, m: d.m, d: d.d, hour: d.h, simulated: false };
+  L.meteo = magasin.a(p.ms);
+  /* la météo du plan s'installe tout de suite, sans transition depuis le plan précédent */
+  const kind = L.meteo.kind || 'overcast'; Object.assign(wx, WX_PARAMS[kind] || WX_PARAMS.overcast);
+  snowCover = clamp((L.meteo.snowDepth || 0)/.12, 0, 1); if (isSnow(kind)) snowCover = Math.max(snowCover, .55 + wx.snow*.3);
+  wetness = isRain(kind) ? 1 : 0;
+  /* plan du voyageur : le train en gare, et la sonnerie du passage à niveau */
+  if (p.train){ Object.assign(train, { phase:'stop', x:STOP_X, t:1, stop:true, traveler:false, said:{} }); L.cloche = 2; } else { train.phase = 'idle'; L.cloche = 0; }
+  $('#recit-quand').textContent = frDate(d.y, d.m, d.d, {weekday:'long', day:'numeric', month:'long'}) + ' · ' + hhmm(d.h) + (L.simule && AVEC_ATELIER ? ' · ' + TR.simule : '');
+  const ko = $('#recit-ko'); ko.hidden = p.type !== 'ko';
+  if (p.type === 'ko'){ $('#recit-ko-kanji').textContent = KO[p.ko][0]; $('#recit-ko-kana').textContent = KO[p.ko][1]; }
+}
+function avancerRecit(dt){ const L = lecture; L.t += dt; L.cloche = Math.max(0, L.cloche - dt); if (L.t >= L.parPlanS) planSuivant(); }
+function finirRecit(){
+  if (!lecture) return;
+  Object.assign(train, lecture.train); cam.pan = lecture.pan;
+  lecture = null; finRecit = performance.now();
+  document.body.classList.remove('en-recit'); $('#recit-ko').hidden = true;
+  son.attenuer && son.attenuer(1);
+  layoutCam();
+}
+/* fondu de 0,6 s entre deux plans : 0,3 s vers le noir, 0,3 s depuis le noir */
+function dessinFondu(){
+  const L = lecture; if (!L) return;
+  const f = RR.plan.fonduS/2, a = Math.max(0, 1 - L.t/f, 1 - (L.parPlanS - L.t)/f);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  if (L.plan.type === 'ko'){ ctx.fillStyle = 'rgba(8,10,20,.62)'; ctx.fillRect(0,0,W,H); }
+  if (a > 0){ ctx.fillStyle = `rgba(4,6,12,${Math.min(1, a)})`; ctx.fillRect(0,0,W,H); }
+}
+let finRecit = -1e9;
+/* passer le récit : un toucher, ou une touche */
+addEventListener('pointerdown', ev => { if (lecture){ ev.stopPropagation(); finirRecit(); } }, true);
+addEventListener('keydown', ev => { if (lecture){ finirRecit(); } }, true);
+
+/* la vignette « Pendant ton absence » : elle s'efface au premier geste ou après 30 s ; le récit reste dans le registre (Revoir) */
+const vignette = $('#vignette'); let vignetteTimer = null;
+function montrerVignette(r){
+  vignette.textContent = `${TR.vignette} · ${tx(TR.duree, {s: Math.round(r.dureeS)})}`;
+  vignette.hidden = false; clearTimeout(vignetteTimer); vignetteTimer = setTimeout(cacherVignette, RR.vignetteS*1000);
+  addEventListener('pointerdown', ev => { if (ev.target !== vignette) cacherVignette(); }, { once: true, capture: true });
+}
+function cacherVignette(){ vignette.hidden = true; clearTimeout(vignetteTimer); }
+vignette.addEventListener('click', () => { if (save.recit.dernier) lancerRecit(save.recit.dernier); });
+
+/* au retour : l'absence depuis la dernière visite. On attend la météo réelle de l'absence (ou 6 s), et que les objets se résolvent. */
+let recitEnAttente = null;
+function quandMeteo(){ if (recitEnAttente) recitEnAttente(); }
+function preparerRecit(de){
+  let fait = false;
+  const go = () => {
+    if (fait) return; fait = true; recitEnAttente = null;
+    objetsTick();
+    const a = Date.now(), r = RECIT.composer(RR, ctxRecit(de, a));
+    save.recit.vus = save.recit.vus.concat([de]).slice(-30);
+    if (r){ save.recit.dernier = { cle: de, de, a, regime: r.regime, parPlanS: r.parPlanS, dureeS: r.dureeS, plans: r.plans.map(planSauve), vu: false }; persist(); montrerVignette(r); }
+    else { persist(); openRegistre(de); }
+  };
+  recitEnAttente = () => setTimeout(go, 400);
+  setTimeout(go, 6000);
+}
+if (AVEC_ATELIER) N.recitCourant = () => ({ lecture: lecture ? { i: lecture.i, n: lecture.plans.length, type: lecture.plan.type, ms: lecture.plan.ms, parPlanS: lecture.parPlanS, simule: lecture.simule } : null, dernier: save.recit.dernier, vignette: !vignette.hidden });
+
 /* panneaux */
 const book = $('#book'), lab = $('#lab'), reg = $('#reg');
 /* son : coupé par défaut ; si le joueur l'a activé, il revient au premier toucher (règle des navigateurs) */
@@ -1490,6 +1603,8 @@ $('#btn-lab').hidden = !ATELIER;
 $('#btn-lab').addEventListener('click', () => { lab.hidden = !lab.hidden; book.hidden = true; reg.hidden = true; });
 $('#btn-reg').addEventListener('click', () => { if (reg.hidden) openRegistre(save.prevVisit || save.lastVisit); else reg.hidden = true; });
 $('#reg-stamp').addEventListener('click', () => { reg.hidden = true; son.event('stamp'); toast(T.registreTamponne); });
+$('#reg-revoir').textContent = TR.revoir;
+$('#reg-revoir').addEventListener('click', () => { if (save.recit.dernier) lancerRecit(save.recit.dernier); });
 document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => { document.getElementById(b.dataset.close).hidden = true; }));
 addEventListener('keydown', ev => { if (ev.key === 'Escape'){ book.hidden = true; lab.hidden = true; reg.hidden = true; } });
 
@@ -1513,6 +1628,16 @@ $('#lab-traveler').addEventListener('click', () => {
   if (!startTrain({stop:true, traveler:true})) toast('Un train est déjà là.');
 });
 $('#lab-away').addEventListener('click', () => { openRegistre(Date.now() - 15*36e5); });
+/* récit d'une absence simulée : la météo réelle connue de ces heures, rien n'est enregistré (ni historique, ni « vu ») */
+$('#lab-recit-lire').addEventListener('click', () => {
+  const h = +$('#lab-absence').value, a = Date.now(), r = RECIT.composer(RR, ctxRecit(a - h*H3, a));
+  const types = RR.types;
+  $('#lab-recit').innerHTML = !r ? 'Aucun plan à montrer : pas de récit, pas de vignette.' :
+    `Régime ${r.regime}${r.calme ? ' (absence calme)' : ''}, ${r.plans.length} plan${r.plans.length > 1 ? 's' : ''} de ${r.parPlanS.toFixed(1)} s, ${r.dureeS} s : ` +
+    r.plans.map(p => `${types.indexOf(p.type) + 1}. ${p.type}${p.sous ? ' (' + p.sous + ')' : ''} ${frDate(...p.jour.split('-').map(Number))} ${hhmm(tokyoAt(p.ms).h)}`).join(' · ') +
+    `. Hors ligne : ${ctxRecit(a - h*H3, a).horsLigne ? 'oui (pas de plan météo)' : 'non'}.`;
+  if (r) lancerRecit(r, { simule: true });
+});
 /* aperçu des traces : montre sans rien enregistrer */
 {
   const sel = $('#lab-trace');
@@ -1565,7 +1690,7 @@ try { const raw = localStorage.getItem(CACHE_METEO); if (raw) magasin.charger(ra
 const clientMeteo = MET.creerClient({
   magasin, lat: STATION.lat, lon: STATION.lon, jours: MET.joursPasses(save.lastVisit, Date.now()),
   fetch: (url, opts) => fetch(url, opts),
-  apres: etat => { if (etat.echecs === 0) try { localStorage.setItem(CACHE_METEO, magasin.serialiser(Date.now())); } catch (e) {} }
+  apres: etat => { if (etat.echecs === 0){ try { localStorage.setItem(CACHE_METEO, magasin.serialiser(Date.now())); } catch (e) {} quandMeteo(); } }
 });
 clientMeteo.actualiser();
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') clientMeteo.reveil(); });
@@ -1660,9 +1785,12 @@ let lastObjets = -1e9;
 function frame(now){
   const dt = Math.min(.1, (now - lastFrame)/1000); lastFrame = now; clock += dt;
   if (sim.fast && sim.hour != null) sim.hour = (sim.hour + dt*.25) % 24;
-  const w = worldTime(); cur = w;
-  vue = MET.pointDeVue(w, meteoPour(w));
-  if (!cam.drag && Math.abs(cam.vel) > .05){ cam.pan += cam.vel; cam.vel *= .92; layoutCam(); }
+  if (lecture) avancerRecit(dt);
+  const w = lecture ? lecture.w : worldTime(); cur = w;
+  /* pendant le récit : l'instant et la météo réelle de l'heure du plan (jamais la météo simulée de l'Atelier) */
+  vue = lecture ? MET.pointDeVue(w, lecture.meteo) : MET.pointDeVue(w, meteoPour(w));
+  if (lecture) layoutCam();
+  else if (!cam.drag && Math.abs(cam.vel) > .05){ cam.pan += cam.vel; cam.vel *= .92; layoutCam(); }
   if (sweep){ sweep.t += dt; if (sweep.t >= 1.2){ sweep = null; save.swept = Date.now(); persist(); toast(T.quaiBalaye); } }
   const info = computeInfo(w);
   // le voyageur de passage ne s'affiche pas en double pendant son arrivée
@@ -1670,14 +1798,15 @@ function frame(now){
   if (trav.state === 'leave') info.waiting = false;
   const target = WX_PARAMS[kindNow()];
   for (const k in wx) wx[k] += (target[k] - wx[k]) * Math.min(1, dt*.8);
-  checkSchedule(w); updateTrain(dt); updateTraveler(dt);
+  if (!lecture){ checkSchedule(w); updateTrain(dt); updateTraveler(dt); }
   drawScene(w, info);
+  if (lecture) dessinFondu();
   const tc = train.x + CAR/2;
   son.update({ rain: wx.rain, snow: wx.snow, wind: windNow(), fog: wx.fog, storm: wx.storm, night: info.night, sunE: info.sun.e,
     ko: info.season.ko, temp: vue.meteo.source === 'reelle' ? tempNow() : 12, lampOn: info.lampOn, furin: hasGift(0), ground: groundSnow(),
-    bell: crossingActive(), train: train.phase === 'idle' ? null : { dist: Math.abs(tc - 790), speed: (train.v||0) / PX_PER_M, pan: clamp((tc - 790)/900, -1, 1) } });
+    bell: lecture ? lecture.cloche > 0 : crossingActive(), train: train.phase === 'idle' ? null : { dist: Math.abs(tc - 790), speed: (train.v||0) / PX_PER_M, pan: clamp((tc - 790)/900, -1, 1) } });
   if (now - lastObjets > 5000){ lastObjets = now; objetsTick(); }
-  if (now - lastHud > 400){ lastHud = now; hud(w, info); }
+  if (!lecture && now - lastHud > 400){ lastHud = now; hud(w, info); }   /* pendant le récit : rien n'est tamponné ni enregistré */
   requestAnimationFrame(frame);
 }
 
@@ -1690,5 +1819,7 @@ save.prevVisit = prev; save.lastVisit = Date.now(); persist();
 const touch = () => { save.lastVisit = Date.now(); persist(); };
 setInterval(touch, 30e3); addEventListener('pagehide', touch); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') touch(); });
 requestAnimationFrame(frame);
-setTimeout(() => { if (!prev || Date.now() - prev > 20*60e3) openRegistre(prev); }, 900);
+/* une absence de 3 h ou plus, jamais proposée : le récit (vignette) ; sinon, comme avant, le registre */
+if (prev && Date.now() - prev >= RR.absenceMinH*H3 && !save.recit.vus.includes(prev)) preparerRecit(prev);
+else setTimeout(() => { if (!prev || Date.now() - prev > 20*60e3) openRegistre(prev); }, 900);
 })();

@@ -17,8 +17,9 @@ NAGORI.TRAINS = [
 /* Le voyageur du sekki : jour d'arrivée après le début du sekki, et train.
    actif : le cahier le veut « seulement s'il est activé » (J9). Désactivé, il ne laisse aucune trace nulle part : ni dans la scène,
    ni au bandeau, au registre, au carnet, ni ses omiyage sur la façade ou le furin ; la sauvegarde garde ses champs (gifts, arrived)
-   intacts, pour le retrouver si on le réactive. Valeur pour le test : à décider par Arsène (true reprend le comportement d'avant). */
-NAGORI.VOYAGEUR = { actif: true, jour: 3, h: 16, m: 20 };
+   intacts, pour le retrouver si on le réactive. Désactivé par défaut (cahier, lot J) ; activé seulement si ses trois textes sont validés
+   le 16 novembre. Le cahier nomme ce réglage VOYAGEUR_TEST.actif et veut les voyageurs des autres sekki désactivés toute la période. */
+NAGORI.VOYAGEUR = { actif: false, jour: 3, h: 16, m: 20 };
 
 /* Omiyage : cadeaux laissés par les voyageurs, qui décorent la gare. id = dessin dans la scène. */
 NAGORI.OMIYAGE = [

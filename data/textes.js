@@ -150,6 +150,14 @@ NAGORI.TEXTES = {
     chasseNeige: '(texte à écrire : registre, le chasse-neige est passé)', cheminotQuai: '(texte à écrire : registre, le cheminot a dégagé le quai)',
     cerfs: '(texte à écrire : registre, des cerfs ont traversé la voie)', renard: '(texte à écrire : registre, un renard près de la salle d\'attente)'
   },
+  /* le récit de l'absence (lot E) : intitulés de l'interface, d'après le cahier ; la ligne des jours calmes est à écrire */
+  recit: {
+    vignette: 'Pendant ton absence',
+    duree: '{s} s',
+    revoir: 'Revoir',
+    simule: 'simulé',
+    joursCalmes: '(texte à écrire : ligne neutre du registre pour les jours calmes, absence de plus de 7 jours)'
+  },
   /* provisoire, hors cahier (session 3, première version) : seulement avec la case « provisoire » de l'Atelier */
   provisoire: {
     compte: '(texte à écrire : fermeture dans {n} jours)',

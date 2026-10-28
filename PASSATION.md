@@ -1,20 +1,20 @@
-# Nagori · passation (28 octobre 2026, début de la session 4)
+# Nagori · passation (28 octobre 2026, fin de la session 4)
 
 Document de reprise pour une nouvelle conversation. Ne duplique pas la bible ni le cahier des charges : il dit où on en est.
 
 ## Sources de vérité, dans cet ordre
 1. `CLAUDE.md` (dépôt) : état technique, règles du projet.
-2. Cahier des charges v3 (projet claude.ai, `claude/Nagori, cahier des charges du prototype de 14 jours.md`) : lots, critères de la partie 9, sessions de la partie 13. Extrait des lots F, G, H dans le dépôt : `docs/cahier-lots-F-G-H.md`.
+2. Cahier des charges v3 (projet claude.ai, `claude/Nagori, cahier des charges du prototype de 14 jours.md`) : lots, critères de la partie 9, sessions de la partie 13. Extraits dans le dépôt : `docs/cahier-lots-F-G-H.md`, `docs/cahier-lot-E.md`.
 3. Bible (`Nagori, bible du projet.docx`) : ne pas la modifier sans Arsène.
 4. Ce fichier : décisions postérieures au cahier.
 
 ## État réel du dépôt
 - Dépôt `arsenesistel-del/nagori`, branche de travail **`session-1`** (poussée). `main` et le site public sont inchangés (`6e05c57`). Ne rien fusionner ni déployer sans accord explicite d'Arsène.
-- Dernier commit de code : « Session 4 : interrupteur du voyageur ». Vérifier avec `git log --oneline | head`.
+- Dernier commit de code : « Session 4 : récit de l'absence (lot E), voyageur désactivé par défaut ». Vérifier avec `git log --oneline | head`.
 - Étiquettes `avant-session-1` (sur `6e05c57`), `avant-session-2`, `avant-session-3` (sur `d491c70`), `avant-session-3-cahier` (sur `d37fcd4`), `avant-session-4` (sur `077be75`) : locales seulement, le proxy refuse de les pousser. Non bloquant (validé). Elles disparaissent avec l'espace de travail : en cas de besoin, retrouver les commits par leur message.
-- Tests à lancer avant toute fin de session : `node tests/meteo.test.js` (27), `node tests/objets.test.js` (18), `node tests/vie.test.js` (22), `python3 -I tests/navigateur.test.py` (~3 min), `python3 -I tests/objets.navigateur.test.py` (~4 min), `python3 -I tests/vie.navigateur.test.py` (~2 min), `python3 -I tests/voyageur.navigateur.test.py` (~2 min).
+- Tests à lancer avant toute fin de session : `node tests/meteo.test.js` (27), `node tests/objets.test.js` (18), `node tests/vie.test.js` (22), `python3 -I tests/navigateur.test.py` (~3 min), `python3 -I tests/objets.navigateur.test.py` (~4 min), `python3 -I tests/vie.navigateur.test.py` (~2 min), `python3 -I tests/voyageur.navigateur.test.py` (~2 min), `node tests/recit.test.js` (12), `python3 -I tests/recit.navigateur.test.py` (~3 min).
 - Session cloud : Python n'a pas Playwright d'office. `pip install playwright==1.63.0 pillow` (la version doit correspondre au Chromium de `/opt/pw-browsers`, sinon « Executable doesn't exist »).
-- Captures de référence : `tests/captures/avant-session-4/` (six états et `traces/`, voyageur activé) et `tests/captures/fin-session-3-cahier/` (six états et `traces/`, sans le provisoire ; `lots-fgh/` : seize états des lots F, G, H, préfixe `p-` pour le provisoire).
+- Captures de référence : `tests/captures/fin-session-4/` (six états et `traces/`, voyageur désactivé), `tests/captures/avant-session-4/` (voyageur activé) et `tests/captures/fin-session-3-cahier/` (six états et `traces/`, sans le provisoire ; `lots-fgh/` : seize états des lots F, G, H, préfixe `p-` pour le provisoire).
 
 ## Fait
 - Session 1 (lots A, B) : météo honnête (`js/meteo.js`), point de vue, sauvegarde v3, tests, captures, région.
@@ -54,20 +54,28 @@ Document de reprise pour une nouvelle conversation. Ne duplique pas la bible ni 
 - Tests : `tests/voyageur.navigateur.test.py`, 29 contrôles, les deux états.
 - Le récit de l'absence devra lire `voyageurActif()` (dans `js/jeu.js`).
 
-### Récit de l'absence (lot E) : bloqué
-- Le dépôt n'a que l'extrait des lots F, G, H. Sans le texte du lot E (et ses critères de la partie 9), le récit n'est pas commencé, pour ne pas refaire l'erreur de la session 3.
-- Ce qu'on sait déjà : les conséquences des objets se résolvent à la fin de leur fenêtre et le récit ne doit jamais prétendre que le joueur y a assisté en direct ; le point de vue (`vue`, `pointDeVue`) est prêt à recevoir d'autres instants ; chaque changement de la fermeture « peut devenir un plan du récit » ; les emplacements de texte restent invisibles en jeu normal.
-- Il faut : `docs/cahier-lot-E.md` (copie verbatim du lot E et des critères concernés), comme pour les lots F, G, H.
-- Étiquettes git locales : acceptées telles quelles.
-- Organisation : un chat par session ou demande importante ; rien dans `main` sans accord.
+### Voyageur : désactivé par défaut (décision d'Arsène, 28 octobre)
+- `VOYAGEUR.actif` vaut `false` (cahier, lot J : activé seulement si ses trois textes sont validés le 16 novembre). Les captures de la session 4 n'ont plus le voyageur sur le banc.
+- Écarts au lot J, connus : le cahier nomme le réglage `VOYAGEUR_TEST.actif`, et veut les voyageurs des autres sekki désactivés toute la période ; ici un seul interrupteur pour tous (conforme tant qu'il vaut `false`).
 
-## Reste à faire (cahier, partie 13)
-| Session | Lots | Dépend de | Peut démarrer sans textes d'Arsène ? |
-| --- | --- | --- | --- |
-| 3 | F (nuit), G (habitués, chat), H (fermeture) | sessions 1 et 2 | faite et alignée sur le cahier ; restes ci-dessous |
-| 4 | E (récit de l'absence) | 2 et 3 | oui |
-| 5 | I, J, K, L, performances, voyageur, ligne « réel et imaginé » | 2 à 4 | oui (compte GoatCounter à créer par Arsène) |
-| 6 | intégration des textes (6a), corrections et mise en ligne (6b) | 5 + textes des 2, 9, 16 novembre | non |
+### Récit de l'absence (lot E) : fait
+- Réglages `data/recit.js`, logique `js/recit.js`, lecture dans `js/jeu.js` (bloc « Le récit de l'absence »). Détail dans `CLAUDE.md`.
+- Conforme (testé) : déclenchement à 3 h avec au moins un plan ; vignette avec la durée du récit, effacée au premier geste ou après 30 s, jamais reproposée, « Revoir » dans le registre ; toucher qui passe ; plans de 2 à 4 s, fondu de 0,6 s, instant et météo réelle de l'heure, cadrage par type, jour et heure en surimpression, « simulé » en Atelier ; les 8 types et leur ordre ; régimes et durées (20 s, 25 s, 7 derniers jours) ; anti-répétition (× 0,3 sur 3 récits, habitué jamais deux récits de suite) ; absence calme, un seul plan ; au moins un plan de jour ; plans météo seulement sur des heures réelles, aucun hors ligne ; voyageur seulement s'il est activé ; rien d'enregistré pendant la lecture ; aucun texte à écrire visible ; variété sur 14 jours et trois rythmes : au plus 33 % pour un type (série SIMULÉE de novembre).
+- Interprétations NON VALIDÉES (à trancher par Arsène) :
+  - absence de plus d'un jour et de moins de deux : traitée comme « 2 à 7 jours » (le cahier ne dit rien entre les deux) ;
+  - au-delà d'un jour, la conséquence de l'objet s'ajoute au meilleur plan de son jour au lieu de le remplacer. Sans cela, un soir sur deux avec un objet posé à chaque visite, l'objet fait 50 % des plans (critère : 40 %) ;
+  - « routine changée » d'un habitué : absence un jour de semaine sans école, pluie réelle à son passage, moment de fermeture (l'objet est déjà le plan 1 ; l'absence de la vieille dame par mauvais temps reste un trait provisoire, hors récit) ;
+  - instants : la trace de l'objet à la fin de sa fenêtre (jamais le geste) ; lever + 15 min, coucher − 15 min ; changement de temps + 18 min ; kō à 7 h ; plan « jour » à midi, seulement pour garantir un plan de jour ;
+  - notes de base (100 à 30 dans l'ordre du cahier), bonus de première neige, cadrages et cibles : `data/recit.js` ;
+  - quand un récit existe, le registre ne s'ouvre plus de lui-même au retour (la visite type du cahier ne l'ouvre pas) ; sous 3 h ou sans plan, il s'ouvre comme avant ;
+  - « hors ligne » : navigateur hors ligne, ou dernière requête Open-Meteo en échec, ou aucune réussie depuis l'ouverture (le récit attend la météo 6 s au plus).
+- Incomplet :
+  - variété et plan de jour vérifiés sur une série simulée ; à refaire avec 14 jours réels (même manque que le rapport des nuits) ;
+  - ligne neutre du registre pour les jours calmes (plus de 7 jours) : emplacement à écrire, donc invisible en jeu normal ;
+  - plan du voyageur : le train est montré à l'arrêt, sans son arrivée animée ;
+  - son : seulement l'ambiance de chaque plan atténuée et la sonnerie du passage à niveau ; pas de sons nouveaux (reportés) ;
+  - registre « 5 lignes au plus par jour » (lot J, session 5).
+- Le récit ne s'appuie sur aucun trait provisoire hors cahier.
 
 ## Session 3 : état exact par rapport au cahier (docs/cahier-lots-F-G-H.md)
 
@@ -78,7 +86,7 @@ Document de reprise pour une nouvelle conversation. Ne duplique pas la bible ni 
 
 ### Incomplet
 - Tous les textes (emplacements « à écrire ») : traduction de l'avis, 3 entrées du cahier, 7 lignes de craie, 2 lignes par habitué, lignes des moments, lignes de registre des changements, textes de la nuit, traces de la session 2, textes des kō, voyageur. Conséquence en jeu normal tant qu'ils manquent : le cahier de la gare ne s'ouvre pas, le registre n'a pas les lignes des changements, toucher l'avis, la craie ou un habitué n'affiche rien. Le critère « chaque changement a sa ligne au registre » n'est donc rempli qu'avec `?atelier`.
-- Voyageur : interrupteur fait (session 4) ; la valeur pour le test reste à décider.
+- Voyageur : interrupteur fait (session 4), désactivé par défaut comme le veut le cahier.
 - Rapport sur 14 nuits réelles : manque la série réelle.
 - Sons nouveaux (scooter, chasse-neige, sabots, pelle) : facultatifs, non faits.
 - « Peut devenir un plan du récit » : session 4.
@@ -94,15 +102,15 @@ Document de reprise pour une nouvelle conversation. Ne duplique pas la bible ni 
 - Le provisoire hors cahier, derrière la case de l'Atelier : garder, retirer ou intégrer (lune et clair de lune, papillons, pas dans la neige, parapluie et bonnet, vieille dame absente par mauvais temps, chat à l'abri, fin de service à 18 h 45 le dernier jour, fleurs à J−7, bandeau à J−30).
 
 ## Dépendances restantes
-- **Voyageur** : interrupteur fait. Reste la valeur pour le test (activé ou non) et la note des objets trouvés du carnet.
-- **Lot E** : extrait du cahier à copier dans `docs/`.
+- **Voyageur** : désactivé par défaut. Reste la note des objets trouvés du carnet (« Les voyageurs oublient… ») et le nom du réglage (lot J).
+- **Série réelle de 14 jours** : elle validerait à la fois le rapport des nuits et la variété du récit.
 - Textes d'Arsène (session 6a, textes des 2, 9 et 16 novembre).
 - Série réelle de 14 nuits : à capturer par le navigateur intégré (le terminal n'atteint pas Open-Meteo), puis `node outils/nuits.js FICHIER`.
 - Relecture du japonais.
 - Bible et cahier : la région (« hors de toute gare réelle ») reste à corriger par Arsène.
 
 ## Prochaine action concrète
-Arsène copie le lot E du cahier dans `docs/cahier-lot-E.md` ; puis le récit de l'absence. Pas de refonte de la session 3 d'ici là.
+Arsène regarde le récit (`?atelier`, « Composer et lire », ou une vraie absence de plus de 3 h) et tranche les interprétations non validées du lot E ; puis la session 5 (lots I, J, K, L), avec l'extrait du cahier dans `docs/`.
 
 ## Pièges connus
 - Le terminal n'atteint pas Open-Meteo ; les séries réelles passent par le navigateur intégré. Les tests naviguent avec Open-Meteo simulé.
