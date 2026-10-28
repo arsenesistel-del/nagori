@@ -101,7 +101,8 @@ NAGORI.TEXTES = {
   },
   objetRange: 'Tu as rangé {objet} aux objets trouvés.',
 
-  /* lots F, G, H (cahier des charges) : emplacements à écrire par Arsène. Le japonais est à relire par un natif. */
+  /* lots F, G, H (cahier des charges) : emplacements à écrire par Arsène, montrés seulement avec ?atelier.
+     Le japonais (avisTitre, avisDate, ardoise, cahierJp) est PROVISOIRE, non validé : à relire par une personne compétente. */
   fermeture: {
     avisTitre: '駅廃止のお知らせ',              /* titre court de l'avis officiel (à relire par un natif) */
     avisDate: '3月12日',                        /* la date en gros : le dernier jour de service */

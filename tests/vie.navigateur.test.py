@@ -70,12 +70,20 @@ with captures.serveur() as port, sync_playwright() as p:
         ok(not err, f'sans Atelier, {nom} : aucune erreur ({err[:2]})')
         ctx.close()
 
-    # 2. le registre : chaque changement de la fermeture a sa ligne, le jour où il arrive
+    # 2. textes « à écrire » : jamais en jeu normal (décision du 28 octobre) ; avec ?atelier, le registre a la ligne du changement
     ctx, page, err = ouvrir(nav, port, jst(2026, 11, 19, 10))
-    ok("l'affiche de la commune" in texte(page, '#reg'), '19 novembre : le registre a la ligne de l\'affiche de la commune')
+    ok('à écrire' not in page.evaluate("document.body.innerText"), '19 novembre, sans Atelier : aucun texte « à écrire » à l\'écran (registre, kō, bandeau)')
+    ok("Pas d'école" not in texte(page, '#reg') and "L'écolier a pris le train" in texte(page, '#reg'), '19 novembre, sans Atelier : le registre garde ses lignes écrites')
+    page.evaluate("document.querySelectorAll('[data-close]').forEach(b => b.click())")
+    page.evaluate("document.getElementById('toast').hidden = true")
+    page.mouse.click(640, 400); page.clock.run_for(300)
+    ok('à écrire' not in page.evaluate("document.body.innerText"), '19 novembre, sans Atelier : toucher la scène ne montre rien « à écrire »')
     ctx.close()
-    ctx, page, err = ouvrir(nav, port, jst(2026, 11, 18, 10))
-    ok("l'affiche de la commune" not in texte(page, '#reg'), '18 novembre : pas encore')
+    ctx, page, err = ouvrir(nav, port, jst(2026, 11, 19, 10), '?atelier')
+    ok("l'affiche de la commune" in texte(page, '#reg'), 'Atelier, 19 novembre : le registre a la ligne (à écrire) de l\'affiche de la commune')
+    ctx.close()
+    ctx, page, err = ouvrir(nav, port, jst(2026, 11, 18, 10), '?atelier')
+    ok("l'affiche de la commune" not in texte(page, '#reg'), 'Atelier, 18 novembre : pas encore')
     ctx.close()
 
     # 3. avec ?atelier, provisoire décoché : ce qui vient du cahier est là

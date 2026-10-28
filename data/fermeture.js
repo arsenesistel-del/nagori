@@ -1,6 +1,8 @@
 /* Nagori · la fermeture (lot H, cahier des charges v3)
    Dates imaginées. La révision des horaires est fixée au samedi 13 mars 2027 (provisoire) ; le dernier jour de service est la veille,
-   comme pour les vraies fermetures. Aucun texte ici : les textes sont dans data/textes.js (fermeture). */
+   comme pour les vraies fermetures. PROVISOIRE (décision du 28 octobre 2026) : ces deux dates suivent l'extrait du cahier
+   (docs/cahier-lots-F-G-H.md) mais restent à vérifier contre le cahier complet avant d'être tenues pour définitives.
+   Aucun texte ici : les textes sont dans data/textes.js (fermeture). */
 const RACINE_F = typeof window !== 'undefined' ? window : globalThis;
 RACINE_F.NAGORI = RACINE_F.NAGORI || {};
 

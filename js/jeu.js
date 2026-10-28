@@ -21,6 +21,11 @@ const TF = T.fermeture, TH = T.habitues, TN = T.nuit, TP = T.provisoire;
 const AVEC_ATELIER = new URLSearchParams(location.search).has('atelier');
 let provOn = AVEC_ATELIER;
 const prov = () => provOn;
+/* Textes « à écrire » (emplacements de data/textes.js) : jamais montrés aux testeurs. En jeu normal, le message, la ligne de registre
+   ou l'entrée qui les porte n'apparaît pas ; avec ?atelier, ils restent visibles pour Arsène (décision du 28 octobre 2026). */
+const aEcrire = s => /à écrire/i.test(String(s == null ? '' : s));
+const montrable = s => AVEC_ATELIER || !aEcrire(s);
+const sansAEcrire = html => AVEC_ATELIER ? html : String(html).replace(/<b>[^<]*<\/b>\s*·\s*texte à écrire\s*\([^)]*\)(<br>)?/gi, '').replace(/\(?texte à écrire[^)]*\)?/gi, '').trim();
 /* remplace {mot} par sa valeur */
 const tx = (str, vars = {}) => String(str).replace(/\{(\w+)\}/g, (_, k) => vars[k] != null ? vars[k] : '');
 const koName = k => `${KO[k][0]} (${KO[k][2]})`;
@@ -1221,7 +1226,7 @@ function eventsOfDay(y,m,d){
   /* la fermeture : chaque changement a sa ligne, le jour où il arrive (data/fermeture.js) */
   const F = VIE.fermeture(FERM, y,m,d, 0);
   for (const id of F.aujourdhui){ const c = FERM.changements.find(x => x.id === id); ev.push([c.h + .01, TF.registre[id], true]); }
-  return ev.sort((a,b)=>a[0]-b[0]);
+  return ev.filter(e => montrable(e[1])).sort((a,b)=>a[0]-b[0]);
 }
 function renderRegistre(fromMs){
   const now = Date.now(), first = !fromMs;
@@ -1251,7 +1256,7 @@ function openRegistre(fromMs){ renderRegistre(fromMs); son.event('page'); $('#re
 
 /* ---------- Interface ---------- */
 const toastEl = $('#toast'); let toastTimer = null;
-function toast(msg){ toastEl.textContent = msg; toastEl.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(()=>toastEl.hidden = true, 3600); }
+function toast(msg){ if (!msg || !montrable(msg)) return; toastEl.textContent = msg; toastEl.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(()=>toastEl.hidden = true, 3600); }
 function phaseLabel(sun){ const P = T.phase; if (sun.e > .18) return sun.morning ? P.matin : P.apresMidi; if (sun.e > 0) return sun.morning ? P.lever : P.finJour; if (sun.e > -.3) return sun.morning ? P.aube : P.crepuscule; return P.nuit; }
 function nextStop(h){ for (const t of TRAINS) if (t.stop && t.h+t.m/60 > h) return hhmm(t.h+t.m/60); const f = TRAINS.find(t=>t.stop); return tx(T.demain, {heure: hhmm(f.h+f.m/60)}); }
 
@@ -1280,17 +1285,17 @@ function showTraveler(){
   panelStep = 0;
   $('#tr-eyebrow').textContent = tx(T.voyageurArrive, {date: frDate(st.tv.day.y, st.tv.day.m, st.tv.day.d), heure: hhmm(st.tv.h)});
   $('#tr-title').textContent = tx(T.voyageurTitre, {sekki: s[1]});
-  $('#tr-slot').innerHTML = T.voyageurArrivee;
+  $('#tr-slot').innerHTML = sansAEcrire(T.voyageurArrivee);
   $('#tr-next').textContent = T.btnAccueillir; $('#tr-later').hidden = false;
   $('#traveler').hidden = false;
 }
 $('#tr-next').addEventListener('click', () => {
   panelStep++;
-  if (panelStep === 1){ $('#tr-slot').innerHTML = T.voyageurHistoire; $('#tr-next').textContent = T.btnLaisserPartir; $('#tr-later').hidden = true; }
+  if (panelStep === 1){ $('#tr-slot').innerHTML = sansAEcrire(T.voyageurHistoire); $('#tr-next').textContent = T.btnLaisserPartir; $('#tr-later').hidden = true; }
   else if (panelStep === 2){
     const st = travelerState(worldTime()); const gift = st.s.i % GIFTS.length;
     save.gifts[st.tv.key] = gift; persist(); trav.state = 'leave'; trav.x = 750; trav.alpha = 1; trav.walk = 0;
-    $('#tr-slot').innerHTML = tx(T.voyageurDepart, {cadeau: GIFTS[gift]}); son.event('gift');
+    $('#tr-slot').innerHTML = sansAEcrire(tx(T.voyageurDepart, {cadeau: GIFTS[gift]})); son.event('gift');
     $('#tr-next').textContent = T.btnFermer;
   }
   else $('#traveler').hidden = true;
@@ -1326,7 +1331,7 @@ function sceneHit(ev){
     if (N8.renard && Math.abs(x - posRenard(N8.renard.k)) < 30 && y > 664 && y < 690) return 'n:renard';
     if (N8.ferme && x > 1028 && x < 1078 && y > 518 && y < 552) return 'n:ferme';
     if (N8.bourrelet && snowCover > .25 && Math.abs(x - RX) < 110 && y > 688 && y < 752) return 'n:bourrelet';
-    if (x > 559 && x < 570 && y > 606 && y < 624) return 'cahier';
+    if (x > 559 && x < 570 && y > 606 && y < 624 && cahierLisible()) return 'cahier';
     if (x > 522 && x < 548 && y > 590 && y < 628) return 'f:avis';
     if (F.faits.includes('affiche-commune') && x > 422 && x < 442 && y > 588 && y < 613) return 'f:afficheCommune';
     if (F.faits.includes('photo-1') && x > 423 && x < 441 && y > 613 && y < 625) return 'f:photo:photo-1';
@@ -1439,16 +1444,18 @@ function renderEtagere(){
     });
     ligne.append(nom, b); liste.appendChild(ligne);
   }
-  { const ligne = document.createElement('div'); ligne.className = 'et-ligne';
+  if (cahierLisible()){ const ligne = document.createElement('div'); ligne.className = 'et-ligne';
     const nom = document.createElement('span'); nom.textContent = `${TF.cahierTitre} (${TF.cahierJp})`;
     const b = document.createElement('button'); b.className = 'chip'; b.textContent = TF.cahierOuvrir; b.addEventListener('click', ouvrirCahier);
     ligne.append(nom, b); liste.appendChild(ligne); }
 }
 function ouvrirEtagere(){ renderEtagere(); $('#etagere').hidden = false; }
 /* le cahier de la gare (lot H) : les entrées déjà écrites, à leur date (data/fermeture.js) */
+function entreesCahier(F){ return FERM.changements.filter(c => c.id.startsWith('cahier-') && F.faits.includes(c.id) && montrable(TF.cahierEntrees[c.id])); }
+const cahierLisible = () => { const w = worldTime(); return AVEC_ATELIER || entreesCahier(VIE.fermeture(FERM, w.y,w.m,w.d,w.hour)).length > 0; };
 function ouvrirCahier(){
   const w = worldTime(), F = VIE.fermeture(FERM, w.y,w.m,w.d,w.hour);
-  const entrees = FERM.changements.filter(c => c.id.startsWith('cahier-') && F.faits.includes(c.id));
+  const entrees = entreesCahier(F);
   $('#ca-titre').textContent = `${TF.cahierJp} · ${TF.cahierTitre}`;
   $('#ca-liste').innerHTML = entrees.length ? entrees.map(c => { const d = VIE.dateDuJour(FERM, c.j); return `<div class="ca-entree"><time>${frDate(d.y,d.m,d.d)}</time><p>${TF.cahierEntrees[c.id]}</p></div>`; }).reverse().join('') : `<p>${TF.cahierVide}</p>`;
   $('#etagere').hidden = true; $('#cahier').hidden = false; son.event('page');
@@ -1608,7 +1615,7 @@ function hud(w, info){
   const nextK = CIEL.nextKo(Date.UTC(w.y,w.m-1,w.d,15), 1)[0];
   $('#ko-until').textContent = nextK ? `jusqu'au ${frDate(...Object.values(addDays(nextK.date.y,nextK.date.m,nextK.date.d,-1)))}` : '';
   const kt = N.KO_TEXTE[info.season.ko];
-  $('#ko-text').innerHTML = kt ? kt : `<span class="todo">${T.koAEcrire}</span>`;
+  $('#ko-text').innerHTML = kt ? kt : AVEC_ATELIER ? `<span class="todo">${T.koAEcrire}</span>` : '';
   $('#lab-hour-val').textContent = hhmm(sim.hour != null ? sim.hour : w.hour);
   if (!save.stamps.includes(info.season.ko)){ save.stamps.push(info.season.ko); persist(); son.event('tampon'); toast(tx(T.nouveauTampon, {ko: koName(info.season.ko)})); }
   const best = info.active.map(id=>MOMENTS.find(m=>m.id===id)).sort((a,b)=>RANK[b.rar]-RANK[a.rar])[0];

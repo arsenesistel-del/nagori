@@ -1,4 +1,4 @@
-# Nagori · passation (27 octobre 2026, session 3 alignée sur le cahier)
+# Nagori · passation (28 octobre 2026, session 3 verrouillée avant la session 4)
 
 Document de reprise pour une nouvelle conversation. Ne duplique pas la bible ni le cahier des charges : il dit où on en est.
 
@@ -10,7 +10,7 @@ Document de reprise pour une nouvelle conversation. Ne duplique pas la bible ni 
 
 ## État réel du dépôt
 - Dépôt `arsenesistel-del/nagori`, branche de travail **`session-1`** (poussée). `main` et le site public sont inchangés (`6e05c57`). Ne rien fusionner ni déployer sans accord explicite d'Arsène.
-- Dernier commit de code : « Session 3 alignée sur le cahier (lots F, G, H) ». Vérifier avec `git log --oneline | head`.
+- Dernier commit de code : « Session 3 : textes à écrire masqués en jeu normal, points provisoires notés ». Vérifier avec `git log --oneline | head`.
 - Étiquettes `avant-session-1` (sur `6e05c57`), `avant-session-2`, `avant-session-3` (sur `d491c70`), `avant-session-3-cahier` (sur `d37fcd4`) : locales seulement, le proxy refuse de les pousser. Non bloquant (validé). Elles disparaissent avec l'espace de travail : en cas de besoin, retrouver les commits par leur message.
 - Tests à lancer avant toute fin de session : `node tests/meteo.test.js` (27), `node tests/objets.test.js` (18), `node tests/vie.test.js` (22), `python3 -I tests/navigateur.test.py` (~3 min), `python3 -I tests/objets.navigateur.test.py` (~4 min), `python3 -I tests/vie.navigateur.test.py` (~2 min).
 - Session cloud : Python n'a pas Playwright d'office. `pip install playwright==1.63.0 pillow` (la version doit correspondre au Chromium de `/opt/pw-browsers`, sinon « Executable doesn't exist »).
@@ -26,6 +26,15 @@ Document de reprise pour une nouvelle conversation. Ne duplique pas la bible ni 
 - L'écolier n'emprunte le parapluie que les jours d'école, si la météo réelle le permet.
 - Les conséquences se résolvent à la fin de leur fenêtre. Le récit de l'absence (session 4) ne doit jamais prétendre que le joueur y a assisté en direct.
 - Lignes de registre : sessions 4 et 5.
+
+## Décisions d'Arsène (28 octobre)
+- **Textes à écrire** : aucun emplacement « texte à écrire » n'est montré aux testeurs. En jeu normal, le message au toucher, la ligne de registre, l'entrée du cahier, le texte du kō et les parties à écrire du panneau du voyageur n'apparaissent pas (`montrable`, `sansAEcrire` dans `jeu.js`). Avec `?atelier`, tout reste visible. Les éléments visuels du cahier restent visibles de tous.
+- **Seuil de neige des cerfs** : 40 cm est arbitraire, non validé. Le cahier ne chiffre pas « neige profonde ». Réglable dans `data/monde.js` (`NUIT.evenements.cerfs.neigeProfondeCm`, avec `facteurNeige`, `chance`, `automne`).
+- **Dates de fermeture** : 12 mars 2027 (dernier jour) et 13 mars 2027 (révision) gardées, provisoires, à vérifier contre le cahier complet (`data/fermeture.js`).
+- **Japonais** : 駅廃止のお知らせ, 3月12日, あと{n}日, 駅ノート restent provisoires tant qu'une personne compétente ne les a pas relus (`data/textes.js`, `fermeture`).
+- **Rapport sur 14 nuits** : critère non rempli. Le dépôt n'a que 7 nuits réelles (octobre) ; les 14 nuits de novembre de `outils/nuits.js` sont simulées et ne valident rien.
+- **Voyageur** : interrupteur à traiter (voir « Dépendances »).
+- Ne modifier ni `main` ni le site public.
 - Étiquettes git locales : acceptées telles quelles.
 - Organisation : un chat par session ou demande importante ; rien dans `main` sans accord.
 
@@ -37,22 +46,39 @@ Document de reprise pour une nouvelle conversation. Ne duplique pas la bible ni 
 | 5 | I, J, K, L, performances, voyageur, ligne « réel et imaginé » | 2 à 4 | oui (compte GoatCounter à créer par Arsène) |
 | 6 | intégration des textes (6a), corrections et mise en ligne (6b) | 5 + textes des 2, 9, 16 novembre | non |
 
-## Lots F, G, H : ce qui reste par rapport au cahier
-- Voyageur « seulement s'il est activé » (J9) et critère « voyageur désactivé : aucune trace de lui nulle part » : pas d'interrupteur pour l'instant (le voyageur reste comme avant). Prévu avec le voyageur en session 5 ?
-- Rapport sur 14 nuits avec une série réelle : `outils/nuits.js` existe, mais le dépôt n'a que 7 jours réels (octobre). Capturer une série réelle de 14 jours par le navigateur intégré.
-- Sons nouveaux (scooter, chasse-neige, sabots, pelle) : facultatifs, non faits.
-- Titres japonais (avis, compte à rebours) à relire par un natif ; tous les textes « texte à écrire » à écrire par Arsène.
-- « Les trois habitués se distinguent au premier coup d'œil sur téléphone » : à vérifier par Arsène.
+## Session 3 : état exact par rapport au cahier (docs/cahier-lots-F-G-H.md)
 
-## Ce qu'il faut d'Arsène
-- Les textes : traduction de l'avis, entrées du cahier, 7 lignes de craie, deux lignes par habitué, lignes des moments et du registre, objets de la nuit.
-- La mise en scène des trois moments (provisoire : l'écolier devant l'avis, la vieille dame qui reste, le cheminot et ses étiquettes).
-- Garder, retirer ou intégrer au cahier le provisoire hors cahier (lune, papillons, pas, traits météo, fin de service, fleurs, bandeau).
-- Seuil de « neige profonde » pour les cerfs (40 cm, imaginé).
-- Nom du chat (pour la session 6a).
+### Conforme (comportement conforme à l'extrait, couvert par les tests)
+- F : horaires des trains inchangés ; livreur en scooter, phare allumé, chaque nuit entre 4 h 05 et 4 h 20 ; fenêtre de ferme allumée vers 4 h 30 jusqu'au lever ; chasse-neige (gyrophare, bourrelet) et cheminot qui dégage le quai à la lanterne vers 5 h seulement après 2 cm de neige réelle en 6 h ; renard près de la salle d'attente, environ 2 nuits sur 10 ; cerfs plus fréquents en automne, plus rares dans la neige profonde, yeux qui brillent sous la lampe ; givre (session 2) ; tirage commun à tous pour une nuit ; cause de chaque événement écrite dans `data/monde.js`.
+- G : routines (écolier les jours d'école, absent les week-ends et le 23 novembre ; vieille dame 13 h-13 h 35, même bout du banc ; cheminot 10 h 30 et 21 h 30, quai après la neige ; chat à heures tirées, sans parole) ; compteur d'habitude (session 2) ; dates des trois moments (20, 24, 26 novembre) ; étiquettes numérotées sur le banc, le poêle et l'horloge, qui restent.
+- H : deux dates dans `data/fermeture.js` ; avis officiel et compte à rebours visibles dès la première visite ; compte à rebours 115 le 17 novembre, 102 le 30, passage à minuit heure du Japon ; cahier de la gare sur l'étagère ; calendrier J1 à J13 aux bonnes dates, décalable d'un seul réglage (`debutTest`) ; photos sépia dessinées en code ; 7 lignes de craie un jour sur deux (`data/craie.js`) ; rien n'est retiré, vidé ni emballé.
+
+### Incomplet
+- Tous les textes (emplacements « à écrire ») : traduction de l'avis, 3 entrées du cahier, 7 lignes de craie, 2 lignes par habitué, lignes des moments, lignes de registre des changements, textes de la nuit, traces de la session 2, textes des kō, voyageur. Conséquence en jeu normal tant qu'ils manquent : le cahier de la gare ne s'ouvre pas, le registre n'a pas les lignes des changements, toucher l'avis, la craie ou un habitué n'affiche rien. Le critère « chaque changement a sa ligne au registre » n'est donc rempli qu'avec `?atelier`.
+- Voyageur : « seulement s'il est activé » (J9) et « voyageur désactivé : aucune trace de lui nulle part » non faits.
+- Rapport sur 14 nuits réelles : manque la série réelle.
+- Sons nouveaux (scooter, chasse-neige, sabots, pelle) : facultatifs, non faits.
+- « Peut devenir un plan du récit » : session 4.
+
+### À valider par Arsène
+- Dates du 12 et du 13 mars 2027 (provisoires).
+- Valeurs imaginées : seuil de neige profonde (40 cm), fréquences des cerfs (12 %, 30 % en automne, ×0,2 dans la neige profonde), heure de la fenêtre de ferme (tirée entre 4 h 20 et 4 h 40), nombre de cerfs (1 à 3).
+- Japonais (relecture compétente).
+- Mise en scène des trois moments : l'écolier devant l'avis avant son train, la vieille dame qui reste jusqu'à 13 h 57, le cheminot à la planchette (heures dans `data/habitues.js`, `moments`).
+- Placements : avis à droite de la porte, affiche de la commune et photos à gauche, horloge ajoutée derrière la vitre de la porte, route du passage à niveau dessinée de face ; cerfs qui longent la voie puis s'arrêtent sous la lampe (vue de profil : interprétation de « traversent la voie »).
+- Le choix de montrer à tous les éléments visuels du cahier (avis, craie, cahier, route, nuit).
+- Silhouettes des trois habitués reconnaissables sur téléphone (critère « qualité »).
+- Le provisoire hors cahier, derrière la case de l'Atelier : garder, retirer ou intégrer (lune et clair de lune, papillons, pas dans la neige, parapluie et bonnet, vieille dame absente par mauvais temps, chat à l'abri, fin de service à 18 h 45 le dernier jour, fleurs à J−7, bandeau à J−30).
+
+## Dépendances restantes
+- **Voyageur** : il touche la scène (arrivée par le train de 16 h 20, banc), le bandeau, le registre, son panneau, le carnet (omiyage), les omiyage de la façade, le son du furin, la sauvegarde (`gifts`, `arrived`) et l'Atelier. Le récit de l'absence (session 4) en ajoutera un usage. Avis : poser l'interrupteur (une constante lue à ces endroits) au début de la session 4, avant d'écrire le récit, pour que celui-ci le respecte dès le départ ; au plus tard avant le test avec les testeurs. Décision d'Arsène.
+- Textes d'Arsène (session 6a, textes des 2, 9 et 16 novembre).
+- Série réelle de 14 nuits : à capturer par le navigateur intégré (le terminal n'atteint pas Open-Meteo), puis `node outils/nuits.js FICHIER`.
+- Relecture du japonais.
+- Bible et cahier : la région (« hors de toute gare réelle ») reste à corriger par Arsène.
 
 ## Prochaine action concrète
-Montrer à Arsène `?atelier` (simuler les dates du 17 au 30 novembre, et le menu de la nuit) et les captures `tests/captures/fin-session-3-cahier/lots-fgh/`, puis la session 4 (lot E).
+Arsène tranche les points « à valider » et l'interrupteur du voyageur, puis la session 4 (lot E). Pas de refonte de la session 3 d'ici là.
 
 ## Pièges connus
 - Le terminal n'atteint pas Open-Meteo ; les séries réelles passent par le navigateur intégré. Les tests naviguent avec Open-Meteo simulé.

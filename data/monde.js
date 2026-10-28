@@ -60,7 +60,9 @@ NAGORI.NUIT = {
     /* le cheminot dégage la neige du quai à la lanterne, vers 5 h. Même cause, mesurée à 5 h. Seulement ces matins-là. */
     cheminotQuai: { de: 29, a: 29.75, neigeCm: 2, fenetreH: 6 },
     /* cerfs d'Ezo qui traversent la voie, yeux qui brillent sous la lampe. Cause : la saison (plus fréquents en automne) ;
-       rares dans la neige profonde (au moins neigeProfondeCm de neige réelle au sol au moment du passage). Souvent aucun. */
+       rares dans la neige profonde (au moins neigeProfondeCm de neige réelle au sol au moment du passage). Souvent aucun.
+       Le cahier ne chiffre ni « neige profonde » ni les fréquences : neigeProfondeCm (40), facteurNeige, chance et automne
+       sont des valeurs arbitraires, NON VALIDÉES, à régler ici. */
     cerfs: { chance: .12, automne: .3, mois: [9, 10, 11], neigeProfondeCm: 40, facteurNeige: .2, de: 22, a: 28.5, duree: .05, max: 3 },
     /* un renard près de la salle d'attente. Aucune cause particulière : environ 2 nuits sur 10. */
     renard: { chance: .2, de: 22, a: 28.5, duree: .04 }
